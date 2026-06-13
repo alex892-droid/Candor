@@ -111,6 +111,14 @@ class Interpreter:
         if e.name == "say":
             print(self.render(self.eval(e.args[0], env)))
             return 0
+        if e.name == "len":
+            return len(self.eval(e.args[0], env))
+        if e.name == "at":
+            t = self.eval(e.args[0], env)
+            i = self.eval(e.args[1], env)
+            if i < 0 or i >= len(t):
+                raise CandorError("indice de texte hors limites", e.line, "runtime")
+            return ord(t[i])
         args = [self.eval(a, env) for a in e.args]
         return self.call(self.funcs[e.name], args)
 

@@ -1,0 +1,157 @@
+// calc.can — un évaluateur d'expressions arithmétiques écrit ENTIÈREMENT en Candor.
+//
+// C'est la première marche vers le self-hosting : un analyseur de langage à descente
+// récursive, écrit dans le langage lui-même. Grammaire (priorités standard) :
+//
+//   expr   := term  (('+' | '-') term)*
+//   term   := factor(('*' | '/') factor)*
+//   factor := nombre | '(' expr ')'
+//
+// Candor étant immuable, on ne « déplace » pas un curseur : chaque non-terminal a
+// DEUX fonctions — une qui calcule la valeur, une « miroir » qui calcule l'indice de
+// fin — et la récursion fait office de boucle. Hypothèse : entrée bien formée, sans
+// espaces. Codes ASCII utilisés : '0'..'9'=48..57, '+'=43 '-'=45 '*'=42 '/'=47
+// '('=40 ')'=41.
+
+fn is_digit(c: Int) -> Bool do
+  give c >= 48 and c <= 57
+end
+
+// --- nombres ---------------------------------------------------------------
+
+fn end_number(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then
+      give end_number(t, i + 1)
+    else
+      give i
+    end
+  else
+    give i
+  end
+end
+
+fn num_acc(t: Text, i: Int, acc: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then
+      give num_acc(t, i + 1, acc * 10 + (at(t, i) - 48))
+    else
+      give acc
+    end
+  else
+    give acc
+  end
+end
+
+fn read_number(t: Text, i: Int) -> Int do
+  give num_acc(t, i, 0)
+end
+
+// --- facteur : nombre ou '(' expr ')' --------------------------------------
+
+fn end_factor(t: Text, i: Int) -> Int do
+  if at(t, i) == 40 then          // '('
+    give end_expr(t, i + 1) + 1   // saute la ')'
+  else
+    give end_number(t, i)
+  end
+end
+
+fn eval_factor(t: Text, i: Int) -> Int do
+  if at(t, i) == 40 then          // '('
+    give eval_expr(t, i + 1)
+  else
+    give read_number(t, i)
+  end
+end
+
+// --- terme : facteur (('*' | '/') facteur)* --------------------------------
+
+fn term_loop(t: Text, j: Int, acc: Int) -> Int do
+  if j < len(t) then
+    let c: Int = at(t, j)
+    if c == 42 then               // '*'
+      give term_loop(t, end_factor(t, j + 1), acc * eval_factor(t, j + 1))
+    else
+      if c == 47 then             // '/'
+        give term_loop(t, end_factor(t, j + 1), acc / eval_factor(t, j + 1))
+      else
+        give acc
+      end
+    end
+  else
+    give acc
+  end
+end
+
+fn eval_term(t: Text, i: Int) -> Int do
+  give term_loop(t, end_factor(t, i), eval_factor(t, i))
+end
+
+fn end_term_loop(t: Text, j: Int) -> Int do
+  if j < len(t) then
+    let c: Int = at(t, j)
+    if c == 42 or c == 47 then
+      give end_term_loop(t, end_factor(t, j + 1))
+    else
+      give j
+    end
+  else
+    give j
+  end
+end
+
+fn end_term(t: Text, i: Int) -> Int do
+  give end_term_loop(t, end_factor(t, i))
+end
+
+// --- expression : terme (('+' | '-') terme)* -------------------------------
+
+fn expr_loop(t: Text, j: Int, acc: Int) -> Int do
+  if j < len(t) then
+    let c: Int = at(t, j)
+    if c == 43 then               // '+'
+      give expr_loop(t, end_term(t, j + 1), acc + eval_term(t, j + 1))
+    else
+      if c == 45 then             // '-'
+        give expr_loop(t, end_term(t, j + 1), acc - eval_term(t, j + 1))
+      else
+        give acc
+      end
+    end
+  else
+    give acc
+  end
+end
+
+fn eval_expr(t: Text, i: Int) -> Int do
+  give expr_loop(t, end_term(t, i), eval_term(t, i))
+end
+
+fn end_expr_loop(t: Text, j: Int) -> Int do
+  if j < len(t) then
+    let c: Int = at(t, j)
+    if c == 43 or c == 45 then
+      give end_expr_loop(t, end_term(t, j + 1))
+    else
+      give j
+    end
+  else
+    give j
+  end
+end
+
+fn end_expr(t: Text, i: Int) -> Int do
+  give end_expr_loop(t, end_term(t, i))
+end
+
+// --- programme -------------------------------------------------------------
+
+fn main() -> Int uses [Console] do
+  let src: Text = "2+3*4-(10-6)/2"
+  say("Expression :")
+  say(src)
+  say("Resultat (attendu 12) :")
+  say(eval_expr(src, 0))
+  give 0
+end

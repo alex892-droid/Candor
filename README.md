@@ -74,7 +74,21 @@ python tests/test_candor.py  # sinon, runner integre (16 tests)
 Implémenté : lexer, parser, vérificateur (types + effets + retour certain), interpréteur
 arbre, **compilateur bytecode + machine virtuelle à pile** avec format binaire `.canc` et
 désassembleur. Types : `Int`, `Bool`, `Text`. Effet de référence : `Console` (via `say`).
+Intégrées : `say`, `len`, `at` (inspection de texte, pures).
 
-Pistes suivantes : davantage d'effets (`Net`, `File`, `Time`), boucles `while`, types
-dépendants légers (`where b != 0`), puis **self-hosting** (réécrire le compilateur en
-Candor — le dernier maillon Python à couper).
+## Vers le self-hosting
+
+But final : réécrire le compilateur de Candor **en Candor**, pour couper le dernier
+maillon Python. C'est un voyage en étapes, car le langage doit d'abord être assez
+expressif pour exprimer un compilateur.
+
+- [x] **Étape 1 — inspecter du texte + écrire un analyseur en Candor.** `len`/`at` + un
+  évaluateur d'expressions à descente récursive (priorités, parenthèses) écrit
+  entièrement en Candor : voir `examples/calc.can`. Comme le langage est immuable, on
+  boucle par récursion. *C'est la preuve que Candor peut parser un langage.*
+- [ ] **Étape 2 — structures de données.** Un lexer produit une liste de tokens, un
+  parser un arbre : il faut un agrégat (listes/enregistrements). C'est le plus gros
+  chantier.
+- [ ] **Étape 3 — effet `File`.** Lire le code source depuis un fichier.
+- [ ] **Étape 4 — self-hosting.** Réécrire lexer → parser → checker → compilateur en
+  Candor, jusqu'à ce que `candor exec compilateur.canc` compile du Candor.

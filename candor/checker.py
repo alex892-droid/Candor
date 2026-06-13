@@ -15,10 +15,12 @@ Une seule erreur suffit à refuser le programme : on échoue tôt et franchement
 from . import ast
 from .errors import CandorError
 
-# Fonctions intégrées : nom -> (signature, type de retour, effets).
-# "ANY1" = exactement un argument de type Int, Bool ou Text.
+# Fonctions intégrées : nom -> {params, ret, effects}.
+# "ANY" dans params = un argument de type Int, Bool ou Text.
 BUILTINS = {
-    "say": ("ANY1", "Int", ["Console"]),
+    "say": {"params": ["ANY"], "ret": "Int", "effects": ["Console"]},
+    "len": {"params": ["Text"], "ret": "Int", "effects": []},
+    "at":  {"params": ["Text", "Int"], "ret": "Int", "effects": []},
 }
 
 
@@ -160,17 +162,23 @@ class Checker:
 
     def type_of_call(self, e, env, required):
         if e.name in BUILTINS:
-            spec, ret, effects = BUILTINS[e.name]
-            if spec == "ANY1":
-                if len(e.args) != 1:
+            spec = BUILTINS[e.name]
+            params = spec["params"]
+            if len(e.args) != len(params):
+                raise CandorError(
+                    f"{e.name!r} attend {len(params)} argument(s), reçu {len(e.args)}", e.line, "checker"
+                )
+            for idx, (arg, pt) in enumerate(zip(e.args, params), start=1):
+                at = self.type_of(arg, env, required)
+                if pt == "ANY":
+                    if at not in ("Int", "Bool", "Text"):
+                        raise CandorError(f"{e.name!r} ne sait pas traiter {at}", e.line, "checker")
+                elif at != pt:
                     raise CandorError(
-                        f"{e.name!r} attend 1 argument, reçu {len(e.args)}", e.line, "checker"
+                        f"argument {idx} de {e.name!r} : attendu {pt}, reçu {at}", e.line, "checker"
                     )
-                at = self.type_of(e.args[0], env, required)
-                if at not in ("Int", "Bool", "Text"):
-                    raise CandorError(f"{e.name!r} ne sait pas afficher {at}", e.line, "checker")
-            required.update(effects)
-            return ret
+            required.update(spec["effects"])
+            return spec["ret"]
 
         if e.name not in self.funcs:
             raise CandorError(f"fonction inconnue : {e.name!r}", e.line, "checker")

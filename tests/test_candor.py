@@ -184,6 +184,45 @@ def test_bytecode_roundtrip_and_disassemble():
     assert "fn #" in text and "CALL" in text
 
 
+# --- primitives de texte (len / at) ------------------------------------------
+
+def test_len_and_at():
+    src = (
+        "fn main() -> Int uses [Console] do\n"
+        '  let s: Text = "AB"\n'
+        "  say(len(s))\n"      # 2
+        "  say(at(s, 0))\n"     # 65 ('A')
+        "  give 0\nend\n"
+    )
+    _, out_tree = run_source(src)
+    _, out_vm = run_vm(src)
+    assert out_tree.split() == ["2", "65"]
+    assert out_vm.split() == ["2", "65"]
+
+
+def test_at_wrong_type_is_rejected():
+    e = expect_error(
+        'fn main() -> Int do\n  give at("x", "y")\nend\n'
+    )
+    assert e.phase == "checker"
+
+
+# --- étape self-hosting : un analyseur écrit en Candor ------------------------
+
+def _read_example(name):
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples", name)
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def test_calc_example_both_engines():
+    src = _read_example("calc.can")
+    _, out_tree = run_source(src)
+    _, out_vm = run_vm(src)
+    assert out_tree.strip().endswith("12")
+    assert out_vm.strip().endswith("12")
+
+
 # --- runner intégré (sans pytest) --------------------------------------------
 
 if __name__ == "__main__":

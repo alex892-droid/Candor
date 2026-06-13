@@ -118,6 +118,14 @@ class VM:
             elif op == Op.SAY:
                 print(render(f.stack.pop()))
                 f.stack.append(0)
+            elif op == Op.LEN:
+                f.stack.append(len(f.stack.pop()))
+            elif op == Op.AT:
+                i = f.stack.pop()
+                t = f.stack.pop()
+                if i < 0 or i >= len(t):
+                    raise CandorError("indice de texte hors limites", None, "runtime")
+                f.stack.append(ord(t[i]))
             elif op == Op.RETURN:
                 value = f.stack.pop()
                 frames.pop()

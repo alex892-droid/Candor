@@ -130,6 +130,13 @@ class _FuncCompiler:
         if e.name == "say":
             self.expr(e.args[0])
             self.emit(Op.SAY)
+        elif e.name == "len":
+            self.expr(e.args[0])
+            self.emit(Op.LEN)
+        elif e.name == "at":
+            self.expr(e.args[0])
+            self.expr(e.args[1])
+            self.emit(Op.AT)
         else:
             for a in e.args:
                 self.expr(a)

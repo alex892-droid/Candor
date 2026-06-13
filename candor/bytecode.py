@@ -53,6 +53,8 @@ class Op:
     # appels et intégrées
     CALL = 80            # u16 index_fonction, u8 nb_args
     SAY = 81             # dépile, affiche (effet Console), empile 0
+    LEN = 82             # dépile un Text, empile sa longueur
+    AT = 83              # dépile (index, text), empile le code du caractère
     RETURN = 96          # dépile la valeur de retour
 
 
