@@ -103,3 +103,9 @@ class BoolLit:
 class TextLit:
     value: str
     line: int
+
+
+@dataclass
+class ListLit:
+    elements: list
+    line: int

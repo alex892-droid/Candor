@@ -102,10 +102,14 @@ class Parser:
         return ast.Param(name, self.parse_type())
 
     def parse_type(self):
+        if self.match("OP", "["):                 # type liste : [T]
+            inner = self.parse_type()
+            self.expect("OP", "]")
+            return "[" + inner + "]"
         t = self.expect("IDENT", what="un type")
         if t.value not in VALID_TYPES:
             raise CandorError(
-                f"type inconnu : {t.value!r} (attendu Int, Bool ou Text)", t.line, "parser"
+                f"type inconnu : {t.value!r} (attendu Int, Bool, Text ou [T])", t.line, "parser"
             )
         return t.value
 
@@ -224,6 +228,15 @@ class Parser:
             e = self.parse_expr()
             self.expect("OP", ")")
             return e
+        if t.kind == "OP" and t.value == "[":      # littéral de liste : [a, b, c]
+            self.advance()
+            elements = []
+            if not self.check("OP", "]"):
+                elements.append(self.parse_expr())
+                while self.match("OP", ","):
+                    elements.append(self.parse_expr())
+            self.expect("OP", "]")
+            return ast.ListLit(elements, t.line)
         if t.kind == "IDENT":
             self.advance()
             if self.match("OP", "("):

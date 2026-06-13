@@ -73,8 +73,10 @@ python tests/test_candor.py  # sinon, runner integre (16 tests)
 
 Implémenté : lexer, parser, vérificateur (types + effets + retour certain), interpréteur
 arbre, **compilateur bytecode + machine virtuelle à pile** avec format binaire `.canc` et
-désassembleur. Types : `Int`, `Bool`, `Text`. Effet de référence : `Console` (via `say`).
-Intégrées : `say`, `len`, `at` (inspection de texte, pures).
+désassembleur. Types : `Int`, `Bool`, `Text`, et **listes immuables `[T]`** (littéraux
+`[a, b, c]`, type déduit ; `[]` typé par le contexte). Effet de référence : `Console`.
+Intégrées : `say`, `len` (Text/liste), `at` (texte), et `cons` / `head` / `tail` /
+`is_empty` / `get` (listes) — toutes pures sauf `say`.
 
 ## Vers le self-hosting
 
@@ -86,9 +88,12 @@ expressif pour exprimer un compilateur.
   évaluateur d'expressions à descente récursive (priorités, parenthèses) écrit
   entièrement en Candor : voir `examples/calc.can`. Comme le langage est immuable, on
   boucle par récursion. *C'est la preuve que Candor peut parser un langage.*
-- [ ] **Étape 2 — structures de données.** Un lexer produit une liste de tokens, un
-  parser un arbre : il faut un agrégat (listes/enregistrements). C'est le plus gros
-  chantier.
+- [x] **Étape 2 — structures de données (listes).** Listes immuables `[T]` avec
+  `cons`/`head`/`tail`/`is_empty`/`get`. Démonstration : `examples/lexer.can` transforme
+  un texte en liste d'entiers (un vrai mini-lexer). *Candor peut désormais produire une
+  liste de tokens.*
+- [ ] **Étape 2b — enregistrements (structs).** Types nommés à champs typés, pour les
+  tokens (`Token{kind, value}`) et les nœuds d'AST.
 - [ ] **Étape 3 — effet `File`.** Lire le code source depuis un fichier.
 - [ ] **Étape 4 — self-hosting.** Réécrire lexer → parser → checker → compilateur en
   Candor, jusqu'à ce que `candor exec compilateur.canc` compile du Candor.

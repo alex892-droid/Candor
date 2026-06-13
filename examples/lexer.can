@@ -1,0 +1,58 @@
+// lexer.can — étape 2 du self-hosting : produire une LISTE en Candor.
+//
+// On transforme un texte "12+34+5" en une liste d'entiers [12, 34, 5] (un mini-lexer :
+// les séparateurs sont ignorés), puis on la parcourt. C'est exactement la capacité qui
+// manquait : un compilateur produit une liste de tokens. Les listes sont immuables — on
+// les construit par récursion avec cons / [], et on les parcourt avec head / tail.
+
+fn is_digit(c: Int) -> Bool do
+  give c >= 48 and c <= 57
+end
+
+fn end_number(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give end_number(t, i + 1) else give i end
+  else
+    give i
+  end
+end
+
+fn num_acc(t: Text, i: Int, acc: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give num_acc(t, i + 1, acc * 10 + (at(t, i) - 48)) else give acc end
+  else
+    give acc
+  end
+end
+
+// Construit la liste des nombres rencontrés à partir de l'indice i.
+fn lex(t: Text, i: Int) -> [Int] do
+  if i < len(t) then
+    if is_digit(at(t, i)) then
+      give cons(num_acc(t, i, 0), lex(t, end_number(t, i)))
+    else
+      give lex(t, i + 1)        // saute le séparateur
+    end
+  else
+    give []                      // type [Int] déduit du type de retour
+  end
+end
+
+fn sum_list(xs: [Int]) -> Int do
+  if is_empty(xs) then
+    give 0
+  else
+    give head(xs) + sum_list(tail(xs))
+  end
+end
+
+fn main() -> Int uses [Console] do
+  let toks: [Int] = lex("12+34+5", 0)
+  say("Nombre de tokens :")
+  say(len(toks))            // 3
+  say("Premier token :")
+  say(get(toks, 0))          // 12
+  say("Somme des tokens :")
+  say(sum_list(toks))        // 51
+  give 0
+end

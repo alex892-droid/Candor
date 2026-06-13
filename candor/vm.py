@@ -126,6 +126,33 @@ class VM:
                 if i < 0 or i >= len(t):
                     raise CandorError("indice de texte hors limites", None, "runtime")
                 f.stack.append(ord(t[i]))
+            elif op == Op.BUILD_LIST:
+                n = (code[f.ip] << 8) | code[f.ip + 1]
+                f.ip += 2
+                items = [f.stack.pop() for _ in range(n)][::-1]
+                f.stack.append(tuple(items))
+            elif op == Op.CONS:
+                xs = f.stack.pop()
+                x = f.stack.pop()
+                f.stack.append((x,) + xs)
+            elif op == Op.HEAD:
+                xs = f.stack.pop()
+                if not xs:
+                    raise CandorError("'head' sur une liste vide", None, "runtime")
+                f.stack.append(xs[0])
+            elif op == Op.TAIL:
+                xs = f.stack.pop()
+                if not xs:
+                    raise CandorError("'tail' sur une liste vide", None, "runtime")
+                f.stack.append(xs[1:])
+            elif op == Op.ISEMPTY:
+                f.stack.append(len(f.stack.pop()) == 0)
+            elif op == Op.GET:
+                i = f.stack.pop()
+                xs = f.stack.pop()
+                if i < 0 or i >= len(xs):
+                    raise CandorError("indice de liste hors limites", None, "runtime")
+                f.stack.append(xs[i])
             elif op == Op.RETURN:
                 value = f.stack.pop()
                 frames.pop()

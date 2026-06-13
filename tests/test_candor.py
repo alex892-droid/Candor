@@ -223,6 +223,62 @@ def test_calc_example_both_engines():
     assert out_vm.strip().endswith("12")
 
 
+# --- listes immuables (étape 2) ----------------------------------------------
+
+def _nums(out):
+    return [w for w in out.split() if w.lstrip("-").isdigit()]
+
+
+def test_lists_literal_and_ops():
+    src = (
+        "fn sum_list(xs: [Int]) -> Int do\n"
+        "  if is_empty(xs) then give 0 else give head(xs) + sum_list(tail(xs)) end\n"
+        "end\n"
+        "fn main() -> Int uses [Console] do\n"
+        "  let xs: [Int] = [12, 34, 5]\n"
+        "  say(len(xs))\n"        # 3
+        "  say(get(xs, 1))\n"      # 34
+        "  say(sum_list(xs))\n"    # 51
+        "  give 0\nend\n"
+    )
+    _, out_tree = run_source(src)
+    _, out_vm = run_vm(src)
+    assert _nums(out_tree) == ["3", "34", "51"]
+    assert _nums(out_vm) == ["3", "34", "51"]
+
+
+def test_cons_and_empty_with_annotation():
+    src = (
+        "fn main() -> Int uses [Console] do\n"
+        "  let xs: [Int] = cons(1, cons(2, []))\n"
+        "  say(len(xs))\n"        # 2
+        "  say(head(xs))\n"       # 1
+        "  give 0\nend\n"
+    )
+    _, out_tree = run_source(src)
+    _, out_vm = run_vm(src)
+    assert _nums(out_tree) == ["2", "1"]
+    assert _nums(out_vm) == ["2", "1"]
+
+
+def test_empty_list_without_annotation_rejected():
+    e = expect_error("fn main() -> Int do\n  give head([])\nend\n")
+    assert e.phase == "checker"
+
+
+def test_heterogeneous_list_rejected():
+    e = expect_error('fn main() -> Int do\n  let xs: [Int] = [1, true]\n  give 0\nend\n')
+    assert e.phase == "checker"
+
+
+def test_lexer_example_both_engines():
+    src = _read_example("lexer.can")
+    _, out_tree = run_source(src)
+    _, out_vm = run_vm(src)
+    assert _nums(out_tree) == ["3", "12", "51"]
+    assert _nums(out_vm) == ["3", "12", "51"]
+
+
 # --- runner intégré (sans pytest) --------------------------------------------
 
 if __name__ == "__main__":

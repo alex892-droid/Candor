@@ -53,8 +53,15 @@ class Op:
     # appels et intégrées
     CALL = 80            # u16 index_fonction, u8 nb_args
     SAY = 81             # dépile, affiche (effet Console), empile 0
-    LEN = 82             # dépile un Text, empile sa longueur
+    LEN = 82             # dépile un Text ou une liste, empile sa longueur
     AT = 83              # dépile (index, text), empile le code du caractère
+    # listes immuables
+    BUILD_LIST = 84      # u16 n : dépile n valeurs, empile la liste
+    CONS = 85            # dépile (liste, élément), empile élément::liste
+    HEAD = 86            # dépile une liste, empile son premier élément
+    TAIL = 87            # dépile une liste, empile son reste
+    ISEMPTY = 88         # dépile une liste, empile un Bool
+    GET = 89             # dépile (index, liste), empile l'élément
     RETURN = 96          # dépile la valeur de retour
 
 
@@ -66,7 +73,9 @@ BIN_OPS = {
     "==": Op.EQ, "!=": Op.NE, "<": Op.LT, ">": Op.GT, "<=": Op.LE, ">=": Op.GE,
 }
 
-_WITH_U16 = {Op.CONST, Op.LOAD, Op.STORE, Op.JUMP, Op.JUMP_IF_FALSE}
+_WITH_U16 = {Op.CONST, Op.LOAD, Op.STORE, Op.JUMP, Op.JUMP_IF_FALSE, Op.BUILD_LIST}
+# opcodes portant un u16 simple (index/compteur), par opposition aux sauts (i16 relatif)
+_U16_PLAIN = {Op.CONST, Op.LOAD, Op.STORE, Op.BUILD_LIST}
 
 
 @dataclass
@@ -107,7 +116,7 @@ def assemble(instrs):
     code = bytearray()
     for i, (op, arg) in enumerate(instrs):
         code.append(op)
-        if op in (Op.CONST, Op.LOAD, Op.STORE):
+        if op in _U16_PLAIN:
             code += _u16(arg)
         elif op in (Op.JUMP, Op.JUMP_IF_FALSE):
             after = offsets[i] + 3
@@ -241,7 +250,7 @@ def disassemble(module):
             op = code[ip]
             ip += 1
             name = OP_NAMES.get(op, f"?{op}")
-            if op in (Op.CONST, Op.LOAD, Op.STORE):
+            if op in _U16_PLAIN:
                 arg = (code[ip] << 8) | code[ip + 1]
                 ip += 2
                 extra = f"   ; {_const_repr(module.consts[arg])}" if op == Op.CONST else ""

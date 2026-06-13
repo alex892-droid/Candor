@@ -61,6 +61,8 @@ class Interpreter:
             return e.value
         if isinstance(e, ast.TextLit):
             return e.value
+        if isinstance(e, ast.ListLit):
+            return tuple(self.eval(el, env) for el in e.elements)   # liste immuable
         if isinstance(e, ast.Ident):
             return env[e.name]
         if isinstance(e, ast.Unary):
@@ -119,6 +121,28 @@ class Interpreter:
             if i < 0 or i >= len(t):
                 raise CandorError("indice de texte hors limites", e.line, "runtime")
             return ord(t[i])
+        if e.name == "cons":
+            x = self.eval(e.args[0], env)
+            xs = self.eval(e.args[1], env)
+            return (x,) + xs
+        if e.name == "head":
+            xs = self.eval(e.args[0], env)
+            if not xs:
+                raise CandorError("'head' sur une liste vide", e.line, "runtime")
+            return xs[0]
+        if e.name == "tail":
+            xs = self.eval(e.args[0], env)
+            if not xs:
+                raise CandorError("'tail' sur une liste vide", e.line, "runtime")
+            return xs[1:]
+        if e.name == "is_empty":
+            return len(self.eval(e.args[0], env)) == 0
+        if e.name == "get":
+            xs = self.eval(e.args[0], env)
+            i = self.eval(e.args[1], env)
+            if i < 0 or i >= len(xs):
+                raise CandorError("indice de liste hors limites", e.line, "runtime")
+            return xs[i]
         args = [self.eval(a, env) for a in e.args]
         return self.call(self.funcs[e.name], args)
 

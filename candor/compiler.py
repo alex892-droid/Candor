@@ -90,6 +90,10 @@ class _FuncCompiler:
             self.emit(Op.CONST, self.module.const(e.value))
         elif isinstance(e, ast.TextLit):
             self.emit(Op.CONST, self.module.const(e.value))
+        elif isinstance(e, ast.ListLit):
+            for el in e.elements:
+                self.expr(el)
+            self.emit(Op.BUILD_LIST, len(e.elements))
         elif isinstance(e, ast.Ident):
             self.emit(Op.LOAD, self.resolve(e.name))
         elif isinstance(e, ast.Unary):
@@ -137,6 +141,23 @@ class _FuncCompiler:
             self.expr(e.args[0])
             self.expr(e.args[1])
             self.emit(Op.AT)
+        elif e.name == "cons":
+            self.expr(e.args[0])
+            self.expr(e.args[1])
+            self.emit(Op.CONS)
+        elif e.name == "head":
+            self.expr(e.args[0])
+            self.emit(Op.HEAD)
+        elif e.name == "tail":
+            self.expr(e.args[0])
+            self.emit(Op.TAIL)
+        elif e.name == "is_empty":
+            self.expr(e.args[0])
+            self.emit(Op.ISEMPTY)
+        elif e.name == "get":
+            self.expr(e.args[0])
+            self.expr(e.args[1])
+            self.emit(Op.GET)
         else:
             for a in e.args:
                 self.expr(a)
