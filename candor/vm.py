@@ -38,8 +38,9 @@ class _Frame:
 
 
 class VM:
-    def __init__(self, module):
+    def __init__(self, module, args=None):
         self.m = module
+        self.args = args or []      # arguments passés au programme (CLI)
 
     def run(self):
         consts = self.m.consts
@@ -166,6 +167,20 @@ class VM:
                 idx = (code[f.ip] << 8) | code[f.ip + 1]
                 f.ip += 2
                 f.stack.append(f.stack.pop()[consts[idx]])
+            elif op == Op.ARG_COUNT:
+                f.stack.append(len(self.args))
+            elif op == Op.ARG:
+                i = f.stack.pop()
+                if i < 0 or i >= len(self.args):
+                    raise CandorError("indice d'argument hors limites", None, "runtime")
+                f.stack.append(self.args[i])
+            elif op == Op.READ_FILE:
+                path = f.stack.pop()
+                try:
+                    with open(path, "r", encoding="utf-8") as fh:
+                        f.stack.append(fh.read())
+                except OSError as ex:
+                    raise CandorError(f"lecture impossible : {path} ({ex})", None, "runtime")
             elif op == Op.RETURN:
                 value = f.stack.pop()
                 frames.pop()

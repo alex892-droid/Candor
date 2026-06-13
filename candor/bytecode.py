@@ -65,6 +65,10 @@ class Op:
     # enregistrements immuables
     MAKE_RECORD = 90     # u16 n : dépile n paires (clé, valeur), empile l'enregistrement
     GET_FIELD = 91       # u16 index_constante (nom de champ) : dépile l'enreg., empile le champ
+    # entrées / sorties
+    READ_FILE = 92       # dépile un chemin (Text), empile le contenu (effet File)
+    ARG = 93             # dépile un index, empile l'argument programme correspondant
+    ARG_COUNT = 94       # empile le nombre d'arguments programme
     RETURN = 96          # dépile la valeur de retour
 
 

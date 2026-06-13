@@ -1,0 +1,20 @@
+// cat.can — étape 3 du self-hosting : lire un fichier (effet File) + arguments programme.
+//
+// Affiche le contenu du fichier passé en argument, puis sa longueur.
+//   python -m candor exec examples/cat.can examples/hello.can
+//
+// main déclare 'uses [Console, File]' : elle écrit (say) ET lit un fichier (read_file).
+// Retire 'File' et Candor refuse de compiler — l'effet est dans le contrat.
+
+fn main() -> Int uses [Console, File] do
+  if arg_count() == 0 then
+    say("usage : candor exec examples/cat.can <fichier>")
+    give 1
+  else
+    let contenu: Text = read_file(arg(0))
+    say(contenu)
+    say("--- longueur ---")
+    say(len(contenu))
+    give 0
+  end
+end

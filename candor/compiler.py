@@ -166,6 +166,14 @@ class _FuncCompiler:
             self.expr(e.args[0])
             self.expr(e.args[1])
             self.emit(Op.GET)
+        elif e.name == "read_file":
+            self.expr(e.args[0])
+            self.emit(Op.READ_FILE)
+        elif e.name == "arg":
+            self.expr(e.args[0])
+            self.emit(Op.ARG)
+        elif e.name == "arg_count":
+            self.emit(Op.ARG_COUNT)
         else:
             for a in e.args:
                 self.expr(a)

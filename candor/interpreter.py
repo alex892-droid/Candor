@@ -17,9 +17,10 @@ class ReturnSignal(Exception):
 
 
 class Interpreter:
-    def __init__(self, program):
+    def __init__(self, program, args=None):
         self.program = program
         self.funcs = {f.name: f for f in program.functions}
+        self.args = args or []      # arguments passés au programme (CLI)
 
     def run(self):
         Checker(self.program).check()      # franchise : on refuse tôt si quoi que ce soit cloche
@@ -147,6 +148,20 @@ class Interpreter:
             if i < 0 or i >= len(xs):
                 raise CandorError("indice de liste hors limites", e.line, "runtime")
             return xs[i]
+        if e.name == "arg_count":
+            return len(self.args)
+        if e.name == "arg":
+            i = self.eval(e.args[0], env)
+            if i < 0 or i >= len(self.args):
+                raise CandorError("indice d'argument hors limites", e.line, "runtime")
+            return self.args[i]
+        if e.name == "read_file":
+            path = self.eval(e.args[0], env)
+            try:
+                with open(path, "r", encoding="utf-8") as fh:
+                    return fh.read()
+            except OSError as ex:
+                raise CandorError(f"lecture impossible : {path} ({ex})", e.line, "runtime")
         args = [self.eval(a, env) for a in e.args]
         return self.call(self.funcs[e.name], args)
 

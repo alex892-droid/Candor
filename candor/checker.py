@@ -20,6 +20,9 @@ from .errors import CandorError
 BUILTINS = {
     "say": {"params": ["ANY"], "ret": "Int", "effects": ["Console"]},
     "at":  {"params": ["Text", "Int"], "ret": "Int", "effects": []},
+    "read_file":  {"params": ["Text"], "ret": "Text", "effects": ["File"]},
+    "arg":        {"params": ["Int"], "ret": "Text", "effects": []},
+    "arg_count":  {"params": [], "ret": "Int", "effects": []},
 }
 
 # Intégrées polymorphes sur les listes, vérifiées à part (type d'élément dynamique).

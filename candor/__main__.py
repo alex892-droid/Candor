@@ -1,11 +1,13 @@
 """Point d'entrée de Candor.
 
-    python -m candor run     <fichier.can>            interprète (tree-walk)
-    python -m candor compile <fichier.can> [out.canc] compile en bytecode binaire
-    python -m candor exec    <fichier.canc|.can>      exécute sur la VM bytecode
-    python -m candor dis     <fichier.canc|.can>      désassemble le bytecode
+    python -m candor run     <fichier.can> [args...]   interprète (tree-walk)
+    python -m candor compile <fichier.can> [out.canc]  compile en bytecode binaire
+    python -m candor exec    <fichier.canc|.can> [args...]  exécute sur la VM bytecode
+    python -m candor dis     <fichier.canc|.can>       désassemble le bytecode
 
-    python -m candor <fichier.can>                     raccourci pour 'run'
+    python -m candor <fichier.can> [args...]            raccourci pour 'run'
+
+Les [args...] sont accessibles dans le programme via arg(i) / arg_count().
 """
 
 import os
@@ -33,8 +35,8 @@ def _module_from(path):
     return bytecode.deserialize(Compiler(_parse(path)).compile())
 
 
-def cmd_run(path):
-    return Interpreter(_parse(path)).run()
+def cmd_run(path, prog_args=None):
+    return Interpreter(_parse(path), prog_args or []).run()
 
 
 def cmd_compile(path, out=None):
@@ -46,8 +48,8 @@ def cmd_compile(path, out=None):
     return 0
 
 
-def cmd_exec(path):
-    return VM(_module_from(path)).run()
+def cmd_exec(path, prog_args=None):
+    return VM(_module_from(path), prog_args or []).run()
 
 
 def cmd_dis(path):
@@ -63,14 +65,14 @@ def main(argv):
     cmd, rest = argv[0], argv[1:]
     try:
         if cmd == "run":
-            return cmd_run(rest[0])
+            return cmd_run(rest[0], rest[1:])
         if cmd == "compile":
             return cmd_compile(rest[0], rest[1] if len(rest) > 1 else None)
         if cmd == "exec":
-            return cmd_exec(rest[0])
+            return cmd_exec(rest[0], rest[1:])
         if cmd == "dis":
             return cmd_dis(rest[0])
-        return cmd_run(cmd)  # raccourci : 'python -m candor fichier.can'
+        return cmd_run(cmd, rest)  # raccourci : 'python -m candor fichier.can [args...]'
     except IndexError:
         print(__doc__)
         return 2

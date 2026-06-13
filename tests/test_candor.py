@@ -7,6 +7,7 @@ grâce au runner intégré en bas de fichier.
 import io
 import os
 import sys
+import tempfile
 from contextlib import redirect_stdout
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,21 +21,21 @@ from candor.parser import Parser                # noqa: E402
 from candor.vm import VM                         # noqa: E402
 
 
-def run_source(src):
+def run_source(src, args=None):
     program = Parser(tokenize(src)).parse_program()
     buf = io.StringIO()
     with redirect_stdout(buf):
-        code = Interpreter(program).run()
+        code = Interpreter(program, args or []).run()
     return code, buf.getvalue()
 
 
-def run_vm(src):
+def run_vm(src, args=None):
     """Compile en bytecode binaire, recharge les octets, exécute sur la VM."""
     program = Parser(tokenize(src)).parse_program()
     module = bytecode.deserialize(Compiler(program).compile())
     buf = io.StringIO()
     with redirect_stdout(buf):
-        code = VM(module).run()
+        code = VM(module, args or []).run()
     return code, buf.getvalue()
 
 
@@ -328,6 +329,36 @@ def test_tokens_example_both_engines():
     _, out_vm = run_vm(src)
     assert _nums(out_tree) == ["5", "12", "0", "2"]
     assert _nums(out_vm) == ["5", "12", "0", "2"]
+
+
+# --- effet File + arguments (étape 3) ----------------------------------------
+
+def test_read_file_and_args():
+    src = (
+        "fn main() -> Int uses [Console, File] do\n"
+        "  say(arg_count())\n"               # 1
+        "  let c: Text = read_file(arg(0))\n"
+        "  say(len(c))\n"                     # 5 (= len("hello"))
+        "  give 0\nend\n"
+    )
+    fd, path = tempfile.mkstemp(suffix=".txt")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("hello")
+        _, out_tree = run_source(src, [path])
+        _, out_vm = run_vm(src, [path])
+        assert _nums(out_tree) == ["1", "5"]
+        assert _nums(out_vm) == ["1", "5"]
+    finally:
+        os.unlink(path)
+
+
+def test_file_effect_must_be_declared():
+    e = expect_error(
+        'fn main() -> Int uses [Console] do\n  say(read_file("x"))\n  give 0\nend\n'
+    )
+    assert e.phase == "checker"
+    assert "File" in e.message
 
 
 # --- runner intégré (sans pytest) --------------------------------------------

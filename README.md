@@ -76,8 +76,9 @@ arbre, **compilateur bytecode + machine virtuelle à pile** avec format binaire 
 désassembleur. Types : `Int`, `Bool`, `Text`, **listes immuables `[T]`** (littéraux
 `[a, b, c]` ; `[]` typé par le contexte) et **enregistrements immuables** (`record Token
 { kind: Int, value: Int }`, construction `Token { ... }`, accès `t.kind`). Effet de
-référence : `Console`. Intégrées : `say`, `len` (Text/liste), `at` (texte), et `cons` /
-`head` / `tail` / `is_empty` / `get` (listes) — toutes pures sauf `say`.
+référence : `Console`, `File`. Intégrées : `say`, `len` (Text/liste), `at` (texte),
+`cons` / `head` / `tail` / `is_empty` / `get` (listes), `read_file` (effet `File`),
+`arg` / `arg_count` (arguments programme) — toutes pures sauf `say` et `read_file`.
 
 ## Vers le self-hosting
 
@@ -96,7 +97,9 @@ expressif pour exprimer un compilateur.
 - [x] **Étape 2b — enregistrements (structs).** Types nommés à champs typés, construction
   `Token { ... }` et accès `t.kind`. Démonstration : `examples/tokens.can` est un lexer
   qui produit une `[Token]` typée. *Candor a maintenant tokens ET nœuds d'AST.*
-- [ ] **Étape 3 — effet `File`.** Lire le code source depuis un fichier (sinon le source
-  reste codé en dur dans le programme).
+- [x] **Étape 3 — effet `File` + arguments.** `read_file` (effet `File`), `arg`/`arg_count`.
+  Démonstration : `examples/cat.can` lit le fichier passé en argument. *Un outil Candor
+  peut maintenant lire un `source.can`.*
 - [ ] **Étape 4 — self-hosting.** Réécrire lexer → parser → checker → compilateur en
-  Candor, jusqu'à ce que `candor exec compilateur.canc` compile du Candor.
+  Candor, jusqu'à ce que `candor exec compilateur.canc` compile du Candor. Premier jalon
+  visé : un **lexer Candor** qui lit un `.can` et émet sa liste de tokens.
