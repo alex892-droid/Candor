@@ -121,6 +121,11 @@ expressif pour exprimer un compilateur.
     valeur in corps`, **parse à partir de la liste de tokens** (et non du texte brut, comme un
     vrai compilateur) et évalue avec un environnement (liste associative de records `Bind`).
     *Le concept de table des symboles, exigé par le checker/compilateur réels, est acquis.*
+  - [x] **Vérificateur de types self-hosté.** `examples/selfhost_checker.can` ajoute un
+    second type (`Bool` via `true`/`false`, `<`, `if`) et un **vérificateur de types écrit en
+    Candor** : il calcule le type de chaque nœud et **rejette le mal-typé avant exécution**
+    (`1+true`, `if 1 then …`). *La signature de Candor — vérifier avant d'exécuter — exprimée
+    en Candor.*
   - [ ] **Boss final — compiler Candor lui-même.** Étendre parser/checker/compilateur au
     langage entier, jusqu'à ce que `candor exec compilateur.canc source.can` produise le même
     `.canc` que la forge Python.

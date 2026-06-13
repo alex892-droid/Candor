@@ -469,6 +469,33 @@ def test_selfhost_let_variables():
         assert _nums(out_tree)[-1] == expected, (expr, out_tree)
 
 
+# --- ÉTAPE 4e : un vérificateur de TYPES écrit EN Candor ---------------------
+
+def test_selfhost_checker_well_typed():
+    src = _read_example("selfhost_checker.can")
+    cases = {
+        "if 2<3 then 10 else 20": "10",
+        "if 5<3 then 10 else 20": "20",
+        "2+3*4": "14",
+        "1<2": "1",
+        "let x = 2<3 in if x then 100 else 0": "100",
+    }
+    for expr, expected in cases.items():
+        _, out_vm = run_vm(src, [expr])
+        _, out_tree = run_source(src, [expr])
+        assert _nums(out_vm)[-1] == expected, (expr, out_vm)
+        assert _nums(out_tree)[-1] == expected, (expr, out_tree)
+
+
+def test_selfhost_checker_rejects_ill_typed():
+    src = _read_example("selfhost_checker.can")
+    for expr in ("1+true", "if 1 then 2 else 3", "if 2<3 then 1 else true", "true*2"):
+        _, out_vm = run_vm(src, [expr])
+        _, out_tree = run_source(src, [expr])
+        assert "ERREUR" in out_vm, (expr, out_vm)
+        assert "ERREUR" in out_tree, (expr, out_tree)
+
+
 # --- runner intégré (sans pytest) --------------------------------------------
 
 if __name__ == "__main__":

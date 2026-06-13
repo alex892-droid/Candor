@@ -1,0 +1,329 @@
+// selfhost_checker.can — ÉTAPE 4e : un VÉRIFICATEUR DE TYPES écrit EN Candor.
+//
+// C'est la signature de Candor (vérifier les types AVANT d'exécuter), reproduite DANS
+// Candor. Le mini-langage a deux types — Int et Bool — donc il y a vraiment quelque chose
+// à vérifier. Le checker calcule le type de chaque nœud de l'AST et rejette le mal-typé.
+//
+//   python -m candor exec examples/selfhost_checker.can "if 2<3 then 10 else 20"  -> Int 10
+//   python -m candor exec examples/selfhost_checker.can "1+true"                  -> ERREUR de type
+//
+// Grammaire :  expr := arith ('<' arith)? ; arith := term(('+'|'-')term)* ;
+//   term := factor(('*'|'/')factor)* ;
+//   factor := nombre | 'true' | 'false' | var | 'if' expr 'then' expr 'else' expr
+//           | 'let' id '=' expr 'in' expr | '(' expr ')'
+// Codes de type : 0 = Int, 1 = Bool, 2 = ERREUR. Nœuds : 0 num,1 bool,2 var,3 let,4 if,
+//   10 '+',11 '-',12 '*',13 '/',14 '<'.
+
+record Token  { kind: Int, lexeme: Text }
+record Node   { kind: Int, value: Int, name: Text, left: [Node], right: [Node] }
+record Parsed { node: Node, next: Int }
+record Bind   { name: Text, value: Int }       // table des symboles (valeur OU code de type)
+
+fn is_digit(c: Int) -> Bool do give c >= 48 and c <= 57 end
+fn is_alpha(c: Int) -> Bool do give (c >= 65 and c <= 90) or (c >= 97 and c <= 122) end
+fn is_space(c: Int) -> Bool do give c == 32 or c == 9 or c == 13 or c == 10 end
+fn ident_cont(c: Int) -> Bool do give is_alpha(c) or is_digit(c) or c == 95 end
+
+fn end_number(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give end_number(t, i + 1) else give i end
+  else give i end
+end
+fn end_ident(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if ident_cont(at(t, i)) then give end_ident(t, i + 1) else give i end
+  else give i end
+end
+
+fn is_kw(s: Text) -> Bool do
+  give s == "let" or s == "in" or s == "true" or s == "false"
+    or s == "if" or s == "then" or s == "else"
+end
+
+fn lex(t: Text, i: Int) -> [Token] do
+  if i >= len(t) then
+    give []
+  else
+    let c: Int = at(t, i)
+    if is_space(c) then
+      give lex(t, i + 1)
+    else
+      if is_digit(c) then
+        let e: Int = end_number(t, i)
+        give cons(Token { kind: 0, lexeme: sub(t, i, e - i) }, lex(t, e))
+      else
+        if is_alpha(c) then
+          let e2: Int = end_ident(t, i)
+          let lx: Text = sub(t, i, e2 - i)
+          if is_kw(lx) then
+            give cons(Token { kind: 2, lexeme: lx }, lex(t, e2))
+          else
+            give cons(Token { kind: 1, lexeme: lx }, lex(t, e2))
+          end
+        else
+          give cons(Token { kind: 3, lexeme: sub(t, i, 1) }, lex(t, i + 1))
+        end
+      end
+    end
+  end
+end
+
+// --- parser (tokens -> AST) ------------------------------------------------
+
+fn tok_kind(toks: [Token], i: Int) -> Int do give get(toks, i).kind end
+fn tok_lex(toks: [Token], i: Int) -> Text do give get(toks, i).lexeme end
+
+fn int_acc(s: Text, i: Int, acc: Int) -> Int do
+  if i < len(s) then give int_acc(s, i + 1, acc * 10 + (at(s, i) - 48)) else give acc end
+end
+fn int_of(s: Text) -> Int do give int_acc(s, 0, 0) end
+
+fn num_node(v: Int) -> Node do give Node { kind: 0, value: v, name: "", left: [], right: [] } end
+fn bool_node(v: Int) -> Node do give Node { kind: 1, value: v, name: "", left: [], right: [] } end
+fn var_node(nm: Text) -> Node do give Node { kind: 2, value: 0, name: nm, left: [], right: [] } end
+fn bin_node(k: Int, l: Node, r: Node) -> Node do give Node { kind: k, value: 0, name: "", left: [l], right: [r] } end
+
+fn parse_factor(toks: [Token], i: Int) -> Parsed do
+  let k: Int = tok_kind(toks, i)
+  if k == 0 then
+    give Parsed { node: num_node(int_of(tok_lex(toks, i))), next: i + 1 }
+  else
+    if k == 1 then
+      give Parsed { node: var_node(tok_lex(toks, i)), next: i + 1 }
+    else
+      if k == 2 then
+        let kw: Text = tok_lex(toks, i)
+        if kw == "true" then
+          give Parsed { node: bool_node(1), next: i + 1 }
+        else
+          if kw == "false" then
+            give Parsed { node: bool_node(0), next: i + 1 }
+          else
+            if kw == "if" then
+              give parse_if(toks, i)
+            else
+              give parse_let(toks, i)
+            end
+          end
+        end
+      else
+        let inner: Parsed = parse_expr(toks, i + 1)
+        give Parsed { node: inner.node, next: inner.next + 1 }
+      end
+    end
+  end
+end
+
+// if cond then a else b   (tokens : if <cond> then <a> else <b>)
+fn parse_if(toks: [Token], i: Int) -> Parsed do
+  let c: Parsed = parse_expr(toks, i + 1)
+  let th: Parsed = parse_expr(toks, c.next + 1)
+  let el: Parsed = parse_expr(toks, th.next + 1)
+  give Parsed { node: Node { kind: 4, value: 0, name: "", left: [c.node], right: [th.node, el.node] }, next: el.next }
+end
+
+fn parse_let(toks: [Token], i: Int) -> Parsed do
+  let name: Text = tok_lex(toks, i + 1)
+  let v: Parsed = parse_expr(toks, i + 3)
+  let body: Parsed = parse_expr(toks, v.next + 1)
+  give Parsed { node: Node { kind: 3, value: 0, name: name, left: [v.node], right: [body.node] }, next: body.next }
+end
+
+fn term_loop(toks: [Token], acc: Node, i: Int) -> Parsed do
+  if i < len(toks) then
+    if tok_kind(toks, i) == 3 then
+      let oc: Int = at(tok_lex(toks, i), 0)
+      if oc == 42 or oc == 47 then
+        let rhs: Parsed = parse_factor(toks, i + 1)
+        if oc == 47 then
+          give term_loop(toks, bin_node(13, acc, rhs.node), rhs.next)
+        else
+          give term_loop(toks, bin_node(12, acc, rhs.node), rhs.next)
+        end
+      else
+        give Parsed { node: acc, next: i }
+      end
+    else
+      give Parsed { node: acc, next: i }
+    end
+  else
+    give Parsed { node: acc, next: i }
+  end
+end
+
+fn parse_term(toks: [Token], i: Int) -> Parsed do
+  let f: Parsed = parse_factor(toks, i)
+  give term_loop(toks, f.node, f.next)
+end
+
+fn arith_loop(toks: [Token], acc: Node, i: Int) -> Parsed do
+  if i < len(toks) then
+    if tok_kind(toks, i) == 3 then
+      let oc: Int = at(tok_lex(toks, i), 0)
+      if oc == 43 or oc == 45 then
+        let rhs: Parsed = parse_term(toks, i + 1)
+        if oc == 43 then
+          give arith_loop(toks, bin_node(10, acc, rhs.node), rhs.next)
+        else
+          give arith_loop(toks, bin_node(11, acc, rhs.node), rhs.next)
+        end
+      else
+        give Parsed { node: acc, next: i }
+      end
+    else
+      give Parsed { node: acc, next: i }
+    end
+  else
+    give Parsed { node: acc, next: i }
+  end
+end
+
+fn parse_arith(toks: [Token], i: Int) -> Parsed do
+  let f: Parsed = parse_term(toks, i)
+  give arith_loop(toks, f.node, f.next)
+end
+
+// expr := arith ('<' arith)?
+fn parse_expr(toks: [Token], i: Int) -> Parsed do
+  let a: Parsed = parse_arith(toks, i)
+  if a.next < len(toks) then
+    if tok_kind(toks, a.next) == 3 then
+      if at(tok_lex(toks, a.next), 0) == 60 then           // '<'
+        let b: Parsed = parse_arith(toks, a.next + 1)
+        give Parsed { node: bin_node(14, a.node, b.node), next: b.next }
+      else
+        give a
+      end
+    else
+      give a
+    end
+  else
+    give a
+  end
+end
+
+// --- LE VÉRIFICATEUR DE TYPES (0 Int, 1 Bool, 2 Erreur) --------------------
+
+fn lookup_type(env: [Bind], name: Text) -> Int do
+  if is_empty(env) then
+    give 2                                   // variable inconnue = erreur
+  else
+    let b: Bind = head(env)
+    if b.name == name then give b.value else give lookup_type(tail(env), name) end
+  end
+end
+
+fn check_node(env: [Bind], n: Node) -> Int do
+  if n.kind == 0 then
+    give 0                                   // nombre : Int
+  else
+    if n.kind == 1 then
+      give 1                                 // true/false : Bool
+    else
+      if n.kind == 2 then
+        give lookup_type(env, n.name)        // variable : type stocké
+      else
+        if n.kind == 3 then                  // let : étend l'env avec le type de la valeur
+          let vt: Int = check_node(env, head(n.left))
+          if vt == 2 then
+            give 2
+          else
+            give check_node(cons(Bind { name: n.name, value: vt }, env), head(n.right))
+          end
+        else
+          if n.kind == 4 then                // if : cond Bool, branches de même type
+            let ct: Int = check_node(env, head(n.left))
+            let tt: Int = check_node(env, head(n.right))
+            let et: Int = check_node(env, head(tail(n.right)))
+            if ct == 1 and tt != 2 and tt == et then give tt else give 2 end
+          else
+            if n.kind == 14 then             // '<' : Int < Int -> Bool
+              let la: Int = check_node(env, head(n.left))
+              let lb: Int = check_node(env, head(n.right))
+              if la == 0 and lb == 0 then give 1 else give 2 end
+            else                             // arithmétique : Int op Int -> Int
+              let aa: Int = check_node(env, head(n.left))
+              let ab: Int = check_node(env, head(n.right))
+              if aa == 0 and ab == 0 then give 0 else give 2 end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+// --- l'évaluateur (Bool encodé 1/0) ----------------------------------------
+
+fn lookup_val(env: [Bind], name: Text) -> Int do
+  if is_empty(env) then
+    give 0
+  else
+    let b: Bind = head(env)
+    if b.name == name then give b.value else give lookup_val(tail(env), name) end
+  end
+end
+
+fn eval_node(env: [Bind], n: Node) -> Int do
+  if n.kind == 0 then
+    give n.value
+  else
+    if n.kind == 1 then
+      give n.value
+    else
+      if n.kind == 2 then
+        give lookup_val(env, n.name)
+      else
+        if n.kind == 3 then
+          let v: Int = eval_node(env, head(n.left))
+          give eval_node(cons(Bind { name: n.name, value: v }, env), head(n.right))
+        else
+          if n.kind == 4 then
+            if eval_node(env, head(n.left)) != 0 then
+              give eval_node(env, head(n.right))
+            else
+              give eval_node(env, head(tail(n.right)))
+            end
+          else
+            let a: Int = eval_node(env, head(n.left))
+            let b: Int = eval_node(env, head(n.right))
+            if n.kind == 10 then give a + b
+            else
+              if n.kind == 11 then give a - b
+              else
+                if n.kind == 12 then give a * b
+                else
+                  if n.kind == 13 then give a / b
+                  else                              // 14 : '<'
+                    if a < b then give 1 else give 0 end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+fn pick_src() -> Text do
+  if arg_count() > 0 then give arg(0) else give "if 2<3 then 10 else 20" end
+end
+
+fn main() -> Int uses [Console] do
+  let src: Text = pick_src()
+  let toks: [Token] = lex(src, 0)
+  let p: Parsed = parse_expr(toks, 0)
+  let ty: Int = check_node([], p.node)
+  say(src)
+  if ty == 2 then
+    say("ERREUR de type (rejete avant execution)")
+    give 1
+  else
+    if ty == 0 then say("Type : Int") else say("Type : Bool") end
+    say("Resultat :")
+    say(eval_node([], p.node))
+    give 0
+  end
+end
