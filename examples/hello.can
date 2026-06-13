@@ -1,0 +1,8 @@
+// hello.can — le tout premier programme Candor.
+// main déclare 'uses [Console]' parce qu'elle appelle say.
+// Sans cette déclaration, Candor refuserait de l'exécuter.
+
+fn main() -> Int uses [Console] do
+  say("Bonjour depuis Candor")
+  give 0
+end

@@ -1,0 +1,11 @@
+// effects_error.can — DOIT échouer à la vérification, AVANT toute exécution.
+//
+// main appelle say (effet Console) mais ne déclare PAS 'uses [Console]'.
+// Candor attrape l'erreur de façon franche et locale, et n'exécute rien.
+// Pour corriger : remplacer la 1re ligne par
+//   fn main() -> Int uses [Console] do
+
+fn main() -> Int do
+  say("ceci ne devrait jamais s'afficher")
+  give 0
+end

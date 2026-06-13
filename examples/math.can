@@ -1,0 +1,25 @@
+// math.can — fonctions, types explicites, immuabilité, if/else.
+
+fn square(n: Int) -> Int do
+  give n * n
+end
+
+fn abs(n: Int) -> Int do
+  if n < 0 then
+    give -n
+  else
+    give n
+  end
+end
+
+fn main() -> Int uses [Console] do
+  let a: Int = 5
+  let b: Int = square(a)        // b est lié une fois, pour toujours
+  say("5 au carre fait")
+  say(b)
+  say("abs(-12) fait")
+  say(abs(-12))
+  say("3 < 5 ?")
+  say(3 < 5)
+  give 0
+end

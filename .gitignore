@@ -1,0 +1,10 @@
+# Artefacts de compilation Candor
+*.canc
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/

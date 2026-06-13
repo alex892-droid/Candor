@@ -1,0 +1,17 @@
+// overflow.can — montre que Candor possède SA sémantique des entiers.
+//
+// La VM définit Int = 64 bits signés avec débordement défini (comme C/Rust/Java).
+//   - sur la VM   :  9223372036854775807 + 1  ->  -9223372036854775808 (boucle)
+//   - en tree-walk:  9223372036854775807 + 1  ->   9223372036854775808 (entiers
+//                     illimités hérités de Python)
+//
+// Compare :
+//   python -m candor run  examples/overflow.can     (sémantique héritée de Python)
+//   python -m candor exec examples/overflow.can     (sémantique propre à la VM)
+
+fn main() -> Int uses [Console] do
+  let max: Int = 9223372036854775807
+  say(max)
+  say(max + 1)
+  give 0
+end
