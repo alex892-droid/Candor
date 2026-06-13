@@ -408,6 +408,27 @@ def test_selfhost_lexer_tree_walk_small_file():
     assert [int(x) for x in out.split()] == _python_lexer_counts(path)
 
 
+# --- ÉTAPE 4b : le parser de Candor écrit EN Candor --------------------------
+
+def test_selfhost_parser_builds_ast_and_evaluates():
+    """Le parser Candor construit un AST (record Node) qu'un évaluateur séparé parcourt."""
+    src = _read_example("selfhost_parser.can")
+    cases = {
+        "2+3*4-(10-6)/2": "12",
+        "1+2+3+4": "10",
+        "2*3*4": "24",
+        "(1+2)*(3+4)": "21",
+        "100/5/2": "10",
+        "7-2-1": "4",
+        "8/3": "2",               # division entière, troncature vers zéro
+    }
+    for expr, expected in cases.items():
+        _, out_vm = run_vm(src, [expr])
+        _, out_tree = run_source(src, [expr])
+        assert _nums(out_vm)[-1] == expected, (expr, out_vm)
+        assert _nums(out_tree)[-1] == expected, (expr, out_tree)
+
+
 # --- runner intégré (sans pytest) --------------------------------------------
 
 if __name__ == "__main__":

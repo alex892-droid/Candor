@@ -1,0 +1,140 @@
+// selfhost_parser.can — ÉTAPE 4b : un parser écrit EN Candor qui construit un AST.
+//
+// Le lexer (étape 4a) découpait du texte en tokens ; ici on va plus loin : on bâtit un
+// véritable arbre syntaxique (record Node récursif), puis un évaluateur SÉPARÉ le parcourt.
+// C'est la preuve que Candor peut produire — et consommer — une structure d'arbre.
+//
+// Les records lèvent la limite « une seule valeur de retour » : chaque fonction de parsing
+// renvoie un Parsed { node, next } — le nœud construit ET la position suivante.
+//
+//   python -m candor exec examples/selfhost_parser.can "2+3*4-(10-6)/2"     -> 12
+//   (sans argument, une expression par défaut est utilisée)
+//
+// Grammaire :  expr := term (('+'|'-') term)* ; term := factor(('*'|'/') factor)* ;
+//              factor := nombre | '(' expr ')'
+
+// Un Node récursif : kind 0 = nombre (value) ; sinon kind = code ASCII de l'opérateur,
+// avec un enfant gauche et un enfant droit (listes de 0 ou 1 élément, faute d'option).
+record Node { kind: Int, value: Int, left: [Node], right: [Node] }
+
+// Résultat d'une fonction de parsing : l'arbre construit + l'indice suivant.
+record Parsed { node: Node, next: Int }
+
+fn is_digit(c: Int) -> Bool do
+  give c >= 48 and c <= 57
+end
+
+fn end_number(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give end_number(t, i + 1) else give i end
+  else
+    give i
+  end
+end
+
+fn num_acc(t: Text, i: Int, acc: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give num_acc(t, i + 1, acc * 10 + (at(t, i) - 48)) else give acc end
+  else
+    give acc
+  end
+end
+
+// factor := nombre | '(' expr ')'
+fn parse_factor(t: Text, i: Int) -> Parsed do
+  if at(t, i) == 40 then                          // '('
+    let inner: Parsed = parse_expr(t, i + 1)
+    give Parsed { node: inner.node, next: inner.next + 1 }   // saute la ')'
+  else
+    let e: Int = end_number(t, i)
+    give Parsed { node: Node { kind: 0, value: num_acc(t, i, 0), left: [], right: [] }, next: e }
+  end
+end
+
+// term := factor (('*'|'/') factor)*
+fn term_loop(t: Text, acc: Node, i: Int) -> Parsed do
+  if i < len(t) then
+    let c: Int = at(t, i)
+    if c == 42 or c == 47 then                     // '*' ou '/'
+      let rhs: Parsed = parse_factor(t, i + 1)
+      give term_loop(t, Node { kind: c, value: 0, left: [acc], right: [rhs.node] }, rhs.next)
+    else
+      give Parsed { node: acc, next: i }
+    end
+  else
+    give Parsed { node: acc, next: i }
+  end
+end
+
+fn parse_term(t: Text, i: Int) -> Parsed do
+  let f: Parsed = parse_factor(t, i)
+  give term_loop(t, f.node, f.next)
+end
+
+// expr := term (('+'|'-') term)*
+fn expr_loop(t: Text, acc: Node, i: Int) -> Parsed do
+  if i < len(t) then
+    let c: Int = at(t, i)
+    if c == 43 or c == 45 then                     // '+' ou '-'
+      let rhs: Parsed = parse_term(t, i + 1)
+      give expr_loop(t, Node { kind: c, value: 0, left: [acc], right: [rhs.node] }, rhs.next)
+    else
+      give Parsed { node: acc, next: i }
+    end
+  else
+    give Parsed { node: acc, next: i }
+  end
+end
+
+fn parse_expr(t: Text, i: Int) -> Parsed do
+  let f: Parsed = parse_term(t, i)
+  give expr_loop(t, f.node, f.next)
+end
+
+// --- consommateurs de l'AST (séparés du parser) ----------------------------
+
+fn size(n: Node) -> Int do
+  if n.kind == 0 then
+    give 1
+  else
+    give 1 + size(head(n.left)) + size(head(n.right))
+  end
+end
+
+fn eval_node(n: Node) -> Int do
+  if n.kind == 0 then
+    give n.value
+  else
+    let l: Int = eval_node(head(n.left))
+    let r: Int = eval_node(head(n.right))
+    if n.kind == 43 then
+      give l + r
+    else
+      if n.kind == 45 then
+        give l - r
+      else
+        if n.kind == 42 then
+          give l * r
+        else
+          give l / r                               // '/'
+        end
+      end
+    end
+  end
+end
+
+fn pick_src() -> Text do
+  if arg_count() > 0 then give arg(0) else give "2+3*4-(10-6)/2" end
+end
+
+fn main() -> Int uses [Console] do
+  let src: Text = pick_src()
+  let p: Parsed = parse_expr(src, 0)
+  say("Expression :")
+  say(src)
+  say("Noeuds dans l'AST :")
+  say(size(p.node))
+  say("Resultat via evaluation de l'AST :")
+  say(eval_node(p.node))
+  give 0
+end

@@ -108,7 +108,10 @@ expressif pour exprimer un compilateur.
     en Candor : il lit un `.can` et le découpe en tokens. Validé en comparant ses
     comptages à ceux du lexer Python de référence sur tous les exemples — y compris en se
     lisant lui-même (1053 tokens). *Du code Candor analyse du code Candor.*
-  - [ ] **Parser self-hosté.** Tokens → arbre (nœuds en `record`).
+  - [x] **Parser self-hosté.** `examples/selfhost_parser.can` est un parser d'expressions
+    écrit en Candor : il construit un AST (`record Node` récursif) qu'un évaluateur séparé
+    parcourt. Les records permettent de renvoyer `Parsed { node, next }` — fini la limite
+    « une seule valeur de retour ». *Candor construit et consomme un arbre.*
   - [ ] **Checker self-hosté.** Vérification types + effets.
   - [ ] **Compilateur self-hosté.** Arbre → bytecode, jusqu'à ce que
     `candor exec compilateur.canc source.can` produise le même `.canc` que la forge Python.
