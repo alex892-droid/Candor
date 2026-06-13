@@ -1,0 +1,197 @@
+// selfhost_let.can — ÉTAPE 4d : variables et environnement, EN Candor.
+//
+// On ajoute au mini-langage des variables via 'let NOM = valeur in corps', et — point clé
+// vers le boss final — on parse à partir de la LISTE DE TOKENS (pas du texte brut), comme un
+// vrai compilateur. L'environnement est une table des symboles : une liste associative de
+// records Bind { name, value }. C'est exactement le concept que réclament le checker et le
+// compilateur réels de Candor.
+//
+//   python -m candor exec examples/selfhost_let.can "let x = 2+3 in x*x"            -> 25
+//   python -m candor exec examples/selfhost_let.can "let a = 10 in let b = 20 in a+b" -> 30
+
+record Token  { kind: Int, lexeme: Text }        // kind 0=nombre 1=ident 2=mot-clé 3=op/ponct
+record Node   { kind: Int, value: Int, name: Text, left: [Node], right: [Node] }
+record Parsed { node: Node, next: Int }
+record Bind   { name: Text, value: Int }          // une entrée de la table des symboles
+
+fn is_digit(c: Int) -> Bool do give c >= 48 and c <= 57 end
+fn is_alpha(c: Int) -> Bool do give (c >= 65 and c <= 90) or (c >= 97 and c <= 122) end
+fn is_space(c: Int) -> Bool do give c == 32 or c == 9 or c == 13 or c == 10 end
+fn ident_cont(c: Int) -> Bool do give is_alpha(c) or is_digit(c) or c == 95 end
+
+fn end_number(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give end_number(t, i + 1) else give i end
+  else give i end
+end
+
+fn end_ident(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if ident_cont(at(t, i)) then give end_ident(t, i + 1) else give i end
+  else give i end
+end
+
+// --- lexer (texte -> [Token]) ----------------------------------------------
+
+fn lex(t: Text, i: Int) -> [Token] do
+  if i >= len(t) then
+    give []
+  else
+    let c: Int = at(t, i)
+    if is_space(c) then
+      give lex(t, i + 1)
+    else
+      if is_digit(c) then
+        let e: Int = end_number(t, i)
+        give cons(Token { kind: 0, lexeme: sub(t, i, e - i) }, lex(t, e))
+      else
+        if is_alpha(c) then
+          let e2: Int = end_ident(t, i)
+          let lx: Text = sub(t, i, e2 - i)
+          if lx == "let" or lx == "in" then
+            give cons(Token { kind: 2, lexeme: lx }, lex(t, e2))
+          else
+            give cons(Token { kind: 1, lexeme: lx }, lex(t, e2))
+          end
+        else
+          give cons(Token { kind: 3, lexeme: sub(t, i, 1) }, lex(t, i + 1))
+        end
+      end
+    end
+  end
+end
+
+// --- parser (liste de tokens -> AST) ---------------------------------------
+
+fn tok_kind(toks: [Token], i: Int) -> Int do give get(toks, i).kind end
+fn tok_lex(toks: [Token], i: Int) -> Text do give get(toks, i).lexeme end
+
+fn int_acc(s: Text, i: Int, acc: Int) -> Int do
+  if i < len(s) then give int_acc(s, i + 1, acc * 10 + (at(s, i) - 48)) else give acc end
+end
+fn int_of(s: Text) -> Int do give int_acc(s, 0, 0) end
+
+fn parse_factor(toks: [Token], i: Int) -> Parsed do
+  let k: Int = tok_kind(toks, i)
+  if k == 0 then                                  // nombre
+    give Parsed { node: Node { kind: 0, value: int_of(tok_lex(toks, i)), name: "", left: [], right: [] }, next: i + 1 }
+  else
+    if k == 2 then                                // 'let'
+      give parse_let(toks, i)
+    else
+      if k == 1 then                              // variable
+        give Parsed { node: Node { kind: 1, value: 0, name: tok_lex(toks, i), left: [], right: [] }, next: i + 1 }
+      else                                        // '(' expr ')'
+        let inner: Parsed = parse_expr(toks, i + 1)
+        give Parsed { node: inner.node, next: inner.next + 1 }
+      end
+    end
+  end
+end
+
+// let NOM = valeur in corps   (tokens : let, ident, '=', <valeur>, in, <corps>)
+fn parse_let(toks: [Token], i: Int) -> Parsed do
+  let name: Text = tok_lex(toks, i + 1)
+  let v: Parsed = parse_expr(toks, i + 3)         // après '='
+  let body: Parsed = parse_expr(toks, v.next + 1) // après 'in'
+  give Parsed { node: Node { kind: 2, value: 0, name: name, left: [v.node], right: [body.node] }, next: body.next }
+end
+
+fn term_loop(toks: [Token], acc: Node, i: Int) -> Parsed do
+  if i < len(toks) then
+    if tok_kind(toks, i) == 3 then
+      let oc: Int = at(tok_lex(toks, i), 0)
+      if oc == 42 or oc == 47 then
+        let rhs: Parsed = parse_factor(toks, i + 1)
+        give term_loop(toks, Node { kind: oc, value: 0, name: "", left: [acc], right: [rhs.node] }, rhs.next)
+      else
+        give Parsed { node: acc, next: i }
+      end
+    else
+      give Parsed { node: acc, next: i }
+    end
+  else
+    give Parsed { node: acc, next: i }
+  end
+end
+
+fn parse_term(toks: [Token], i: Int) -> Parsed do
+  let f: Parsed = parse_factor(toks, i)
+  give term_loop(toks, f.node, f.next)
+end
+
+fn expr_loop(toks: [Token], acc: Node, i: Int) -> Parsed do
+  if i < len(toks) then
+    if tok_kind(toks, i) == 3 then
+      let oc: Int = at(tok_lex(toks, i), 0)
+      if oc == 43 or oc == 45 then
+        let rhs: Parsed = parse_term(toks, i + 1)
+        give expr_loop(toks, Node { kind: oc, value: 0, name: "", left: [acc], right: [rhs.node] }, rhs.next)
+      else
+        give Parsed { node: acc, next: i }
+      end
+    else
+      give Parsed { node: acc, next: i }
+    end
+  else
+    give Parsed { node: acc, next: i }
+  end
+end
+
+fn parse_expr(toks: [Token], i: Int) -> Parsed do
+  let f: Parsed = parse_term(toks, i)
+  give expr_loop(toks, f.node, f.next)
+end
+
+// --- évaluation avec table des symboles ([Bind]) ---------------------------
+
+fn lookup(env: [Bind], name: Text) -> Int do
+  if is_empty(env) then
+    give 0                                        // variable inconnue : 0 (simplifié)
+  else
+    let b: Bind = head(env)
+    if b.name == name then give b.value else give lookup(tail(env), name) end
+  end
+end
+
+fn eval_node(env: [Bind], n: Node) -> Int do
+  if n.kind == 0 then
+    give n.value
+  else
+    if n.kind == 1 then
+      give lookup(env, n.name)
+    else
+      if n.kind == 2 then                         // let : étend l'environnement
+        let v: Int = eval_node(env, head(n.left))
+        give eval_node(cons(Bind { name: n.name, value: v }, env), head(n.right))
+      else
+        let a: Int = eval_node(env, head(n.left))
+        let b: Int = eval_node(env, head(n.right))
+        if n.kind == 43 then
+          give a + b
+        else
+          if n.kind == 45 then
+            give a - b
+          else
+            if n.kind == 42 then give a * b else give a / b end
+          end
+        end
+      end
+    end
+  end
+end
+
+fn pick_src() -> Text do
+  if arg_count() > 0 then give arg(0) else give "let x = 2+3 in x*x" end
+end
+
+fn main() -> Int uses [Console] do
+  let src: Text = pick_src()
+  let toks: [Token] = lex(src, 0)
+  let p: Parsed = parse_expr(toks, 0)
+  say("Expression :")
+  say(src)
+  say("Resultat (variables + table des symboles, en Candor) :")
+  say(eval_node([], p.node))
+  give 0
+end

@@ -449,6 +449,26 @@ def test_selfhost_full_pipeline():
         assert _nums(out_tree)[-1] == expected, (expr, out_tree)
 
 
+# --- ÉTAPE 4d : variables + table des symboles, parsing sur tokens -----------
+
+def test_selfhost_let_variables():
+    src = _read_example("selfhost_let.can")
+    cases = {
+        "let x = 2+3 in x*x": "25",
+        "let a = 10 in let b = 20 in a+b": "30",
+        "let x = 5 in let y = x*2 in x+y": "15",
+        "1+2*3": "7",
+        "let x = 7 in x": "7",
+        "let n = 100 in n/4/5": "5",
+        "(let x = 3 in x*x)+1": "10",
+    }
+    for expr, expected in cases.items():
+        _, out_vm = run_vm(src, [expr])
+        _, out_tree = run_source(src, [expr])
+        assert _nums(out_vm)[-1] == expected, (expr, out_vm)
+        assert _nums(out_tree)[-1] == expected, (expr, out_tree)
+
+
 # --- runner intégré (sans pytest) --------------------------------------------
 
 if __name__ == "__main__":

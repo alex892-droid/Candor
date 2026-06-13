@@ -117,6 +117,10 @@ expressif pour exprimer un compilateur.
     liste d'instructions `[Int]`) et une machine à pile (pile = liste, push = `cons`). C'est
     l'architecture même de Candor, reproduite dans Candor pour l'arithmétique. *La preuve que
     le motif compilateur+VM est exprimable dans le langage.*
+  - [x] **Variables + table des symboles.** `examples/selfhost_let.can` ajoute `let NOM =
+    valeur in corps`, **parse à partir de la liste de tokens** (et non du texte brut, comme un
+    vrai compilateur) et évalue avec un environnement (liste associative de records `Bind`).
+    *Le concept de table des symboles, exigé par le checker/compilateur réels, est acquis.*
   - [ ] **Boss final — compiler Candor lui-même.** Étendre parser/checker/compilateur au
     langage entier, jusqu'à ce que `candor exec compilateur.canc source.can` produise le même
     `.canc` que la forge Python.
