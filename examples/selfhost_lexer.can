@@ -1,0 +1,163 @@
+// selfhost_lexer.can — ÉTAPE 4 : un lexer de Candor écrit EN Candor.
+//
+// Il lit un fichier .can (passé en argument), le découpe en tokens et compte chaque
+// catégorie. C'est le premier maillon d'un compilateur self-hosté : du code Candor qui
+// lit du code Candor. On vérifie sa correction en comparant ses comptages à ceux du
+// lexer Python de référence (voir tests/test_candor.py).
+//
+//   python -m candor exec examples/selfhost_lexer.can examples/hello.can
+//
+// Genres de tokens :  0 = nombre  1 = identifiant  2 = mot-clé  3 = texte  4 = opérateur
+
+record Token { kind: Int, lexeme: Text }
+
+// --- classification de caractères (codes ASCII) ----------------------------
+
+fn is_digit(c: Int) -> Bool do
+  give c >= 48 and c <= 57
+end
+
+fn is_alpha(c: Int) -> Bool do
+  give (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
+end
+
+fn ident_start(c: Int) -> Bool do
+  give is_alpha(c) or c == 95          // lettre ou '_'
+end
+
+fn ident_cont(c: Int) -> Bool do
+  give is_alpha(c) or is_digit(c) or c == 95
+end
+
+fn is_space(c: Int) -> Bool do
+  give c == 32 or c == 9 or c == 13 or c == 10
+end
+
+// --- fins de lexèmes (récursion = boucle) ----------------------------------
+
+fn end_number(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give end_number(t, i + 1) else give i end
+  else
+    give i
+  end
+end
+
+fn end_ident(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if ident_cont(at(t, i)) then give end_ident(t, i + 1) else give i end
+  else
+    give i
+  end
+end
+
+fn end_line(t: Text, i: Int) -> Int do          // jusqu'au saut de ligne (commentaire)
+  if i < len(t) then
+    if at(t, i) == 10 then give i else give end_line(t, i + 1) end
+  else
+    give i
+  end
+end
+
+fn end_text(t: Text, j: Int) -> Int do          // jusqu'au guillemet fermant inclus
+  if j < len(t) then
+    if at(t, j) == 34 then give j + 1 else give end_text(t, j + 1) end
+  else
+    give j
+  end
+end
+
+// --- reconnaissances ponctuelles -------------------------------------------
+
+fn is_two_char_op(t: Text, i: Int) -> Bool do
+  if i + 1 < len(t) then
+    let a: Int = at(t, i)
+    let b: Int = at(t, i + 1)
+    // ->(45,62)  ==(61,61)  !=(33,61)  <=(60,61)  >=(62,61)
+    give (a == 45 and b == 62) or (a == 61 and b == 61) or (a == 33 and b == 61) or (a == 60 and b == 61) or (a == 62 and b == 61)
+  else
+    give false
+  end
+end
+
+fn is_comment(t: Text, i: Int) -> Bool do
+  if i + 1 < len(t) then
+    give at(t, i) == 47 and at(t, i + 1) == 47
+  else
+    give false
+  end
+end
+
+fn is_keyword(s: Text) -> Bool do
+  give s == "fn" or s == "do" or s == "end" or s == "let" or s == "give"
+    or s == "if" or s == "then" or s == "else" or s == "uses" or s == "and"
+    or s == "or" or s == "not" or s == "true" or s == "false" or s == "record"
+end
+
+// --- le lexer ---------------------------------------------------------------
+
+fn lex(t: Text, i: Int) -> [Token] do
+  if i >= len(t) then
+    give []
+  else
+    let c: Int = at(t, i)
+    if is_space(c) then
+      give lex(t, i + 1)                                  // ignore l'espace
+    else
+      if is_comment(t, i) then
+        give lex(t, end_line(t, i))                       // ignore le commentaire
+      else
+        if is_digit(c) then
+          let e: Int = end_number(t, i)
+          give cons(Token { kind: 0, lexeme: sub(t, i, e - i) }, lex(t, e))
+        else
+          if ident_start(c) then
+            let e2: Int = end_ident(t, i)
+            let lx: Text = sub(t, i, e2 - i)
+            if is_keyword(lx) then
+              give cons(Token { kind: 2, lexeme: lx }, lex(t, e2))
+            else
+              give cons(Token { kind: 1, lexeme: lx }, lex(t, e2))
+            end
+          else
+            if c == 34 then                               // guillemet : texte
+              let e3: Int = end_text(t, i + 1)
+              give cons(Token { kind: 3, lexeme: sub(t, i, e3 - i) }, lex(t, e3))
+            else
+              if is_two_char_op(t, i) then
+                give cons(Token { kind: 4, lexeme: sub(t, i, 2) }, lex(t, i + 2))
+              else
+                give cons(Token { kind: 4, lexeme: sub(t, i, 1) }, lex(t, i + 1))
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+fn count_kind(xs: [Token], k: Int) -> Int do
+  if is_empty(xs) then
+    give 0
+  else
+    let h: Token = head(xs)
+    if h.kind == k then
+      give 1 + count_kind(tail(xs), k)
+    else
+      give count_kind(tail(xs), k)
+    end
+  end
+end
+
+fn main() -> Int uses [Console, File] do
+  let src: Text = read_file(arg(0))
+  let toks: [Token] = lex(src, 0)
+  say(len(toks))                  // total
+  say(count_kind(toks, 0))        // nombres
+  say(count_kind(toks, 1))        // identifiants
+  say(count_kind(toks, 2))        // mots-clés
+  say(count_kind(toks, 3))        // textes
+  say(count_kind(toks, 4))        // opérateurs
+  give 0
+end

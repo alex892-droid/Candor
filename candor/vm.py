@@ -167,6 +167,13 @@ class VM:
                 idx = (code[f.ip] << 8) | code[f.ip + 1]
                 f.ip += 2
                 f.stack.append(f.stack.pop()[consts[idx]])
+            elif op == Op.SUBSTR:
+                count = f.stack.pop()
+                start = f.stack.pop()
+                t = f.stack.pop()
+                if start < 0 or count < 0 or start + count > len(t):
+                    raise CandorError("sous-chaîne hors limites", None, "runtime")
+                f.stack.append(t[start:start + count])
             elif op == Op.ARG_COUNT:
                 f.stack.append(len(self.args))
             elif op == Op.ARG:

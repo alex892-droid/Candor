@@ -20,6 +20,7 @@ from .errors import CandorError
 BUILTINS = {
     "say": {"params": ["ANY"], "ret": "Int", "effects": ["Console"]},
     "at":  {"params": ["Text", "Int"], "ret": "Int", "effects": []},
+    "sub": {"params": ["Text", "Int", "Int"], "ret": "Text", "effects": []},
     "read_file":  {"params": ["Text"], "ret": "Text", "effects": ["File"]},
     "arg":        {"params": ["Int"], "ret": "Text", "effects": []},
     "arg_count":  {"params": [], "ret": "Int", "effects": []},

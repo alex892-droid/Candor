@@ -174,6 +174,11 @@ class _FuncCompiler:
             self.emit(Op.ARG)
         elif e.name == "arg_count":
             self.emit(Op.ARG_COUNT)
+        elif e.name == "sub":
+            self.expr(e.args[0])
+            self.expr(e.args[1])
+            self.expr(e.args[2])
+            self.emit(Op.SUBSTR)
         else:
             for a in e.args:
                 self.expr(a)

@@ -210,9 +210,12 @@ def test_at_wrong_type_is_rejected():
 
 # --- étape self-hosting : un analyseur écrit en Candor ------------------------
 
+def _example_path(name):
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples", name)
+
+
 def _read_example(name):
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples", name)
-    with open(path, "r", encoding="utf-8") as f:
+    with open(_example_path(name), "r", encoding="utf-8") as f:
         return f.read()
 
 
@@ -359,6 +362,50 @@ def test_file_effect_must_be_declared():
     )
     assert e.phase == "checker"
     assert "File" in e.message
+
+
+# --- sous-chaîne (sub) -------------------------------------------------------
+
+def test_sub():
+    src = (
+        "fn main() -> Int uses [Console] do\n"
+        '  say(sub("bonjour", 0, 3))\n'      # bon
+        '  say(sub("bonjour", 3, 4))\n'      # jour
+        "  give 0\nend\n"
+    )
+    _, out_tree = run_source(src)
+    _, out_vm = run_vm(src)
+    assert out_tree.split() == ["bon", "jour"]
+    assert out_vm.split() == ["bon", "jour"]
+
+
+# --- ÉTAPE 4 : le lexer de Candor écrit EN Candor ----------------------------
+
+def _python_lexer_counts(path):
+    from collections import Counter
+    with open(path, encoding="utf-8") as f:
+        toks = [t for t in tokenize(f.read()) if t.kind != "EOF"]
+    m = {"INT": 0, "IDENT": 1, "KEYWORD": 2, "TEXT": 3, "OP": 4}
+    c = Counter(m[t.kind] for t in toks)
+    return [len(toks), c[0], c[1], c[2], c[3], c[4]]
+
+
+def test_selfhost_lexer_agrees_with_reference_vm():
+    """Le lexer Candor (sur la VM) produit les MÊMES comptages que le lexer Python."""
+    lexer_src = _read_example("selfhost_lexer.can")
+    for tgt in ("hello.can", "math.can", "tokens.can", "lexer.can", "selfhost_lexer.can"):
+        path = _example_path(tgt)
+        _, out = run_vm(lexer_src, [path])
+        got = [int(x) for x in out.split()]
+        assert got == _python_lexer_counts(path), (tgt, got)
+
+
+def test_selfhost_lexer_tree_walk_small_file():
+    # Le tree-walk récursif est limité par la pile Python : on le vérifie sur un petit fichier.
+    lexer_src = _read_example("selfhost_lexer.can")
+    path = _example_path("hello.can")
+    _, out = run_source(lexer_src, [path])
+    assert [int(x) for x in out.split()] == _python_lexer_counts(path)
 
 
 # --- runner intégré (sans pytest) --------------------------------------------

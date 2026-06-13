@@ -76,9 +76,12 @@ arbre, **compilateur bytecode + machine virtuelle à pile** avec format binaire 
 désassembleur. Types : `Int`, `Bool`, `Text`, **listes immuables `[T]`** (littéraux
 `[a, b, c]` ; `[]` typé par le contexte) et **enregistrements immuables** (`record Token
 { kind: Int, value: Int }`, construction `Token { ... }`, accès `t.kind`). Effet de
-référence : `Console`, `File`. Intégrées : `say`, `len` (Text/liste), `at` (texte),
-`cons` / `head` / `tail` / `is_empty` / `get` (listes), `read_file` (effet `File`),
-`arg` / `arg_count` (arguments programme) — toutes pures sauf `say` et `read_file`.
+référence : `Console`, `File`. Intégrées : `say`, `len` (Text/liste), `at` / `sub`
+(texte), `cons` / `head` / `tail` / `is_empty` / `get` (listes), `read_file` (effet
+`File`), `arg` / `arg_count` (arguments programme) — toutes pures sauf `say` et `read_file`.
+
+> Note : la VM bytecode est itérative et gère une récursion profonde ; l'interpréteur
+> tree-walk récurse sur la pile Python et sert de référence simple pour de petits programmes.
 
 ## Vers le self-hosting
 
@@ -100,6 +103,12 @@ expressif pour exprimer un compilateur.
 - [x] **Étape 3 — effet `File` + arguments.** `read_file` (effet `File`), `arg`/`arg_count`.
   Démonstration : `examples/cat.can` lit le fichier passé en argument. *Un outil Candor
   peut maintenant lire un `source.can`.*
-- [ ] **Étape 4 — self-hosting.** Réécrire lexer → parser → checker → compilateur en
-  Candor, jusqu'à ce que `candor exec compilateur.canc` compile du Candor. Premier jalon
-  visé : un **lexer Candor** qui lit un `.can` et émet sa liste de tokens.
+- **Étape 4 — self-hosting (en cours).**
+  - [x] **Lexer self-hosté.** `examples/selfhost_lexer.can` est un lexer de Candor écrit
+    en Candor : il lit un `.can` et le découpe en tokens. Validé en comparant ses
+    comptages à ceux du lexer Python de référence sur tous les exemples — y compris en se
+    lisant lui-même (1053 tokens). *Du code Candor analyse du code Candor.*
+  - [ ] **Parser self-hosté.** Tokens → arbre (nœuds en `record`).
+  - [ ] **Checker self-hosté.** Vérification types + effets.
+  - [ ] **Compilateur self-hosté.** Arbre → bytecode, jusqu'à ce que
+    `candor exec compilateur.canc source.can` produise le même `.canc` que la forge Python.

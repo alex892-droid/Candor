@@ -4,6 +4,8 @@ Comme la vérification a déjà eu lieu, l'exécution suppose des types corrects
 elle ne re-vérifie que ce qui ne peut l'être qu'à l'exécution (ex. division par zéro).
 """
 
+import sys
+
 from . import ast
 from .checker import Checker
 from .errors import CandorError
@@ -23,6 +25,9 @@ class Interpreter:
         self.args = args or []      # arguments passés au programme (CLI)
 
     def run(self):
+        # Candor boucle par récursion (immuabilité) : on autorise une pile profonde.
+        if sys.getrecursionlimit() < 20000:
+            sys.setrecursionlimit(20000)
         Checker(self.program).check()      # franchise : on refuse tôt si quoi que ce soit cloche
         return self.call(self.funcs["main"], [])
 
@@ -148,6 +153,13 @@ class Interpreter:
             if i < 0 or i >= len(xs):
                 raise CandorError("indice de liste hors limites", e.line, "runtime")
             return xs[i]
+        if e.name == "sub":
+            t = self.eval(e.args[0], env)
+            start = self.eval(e.args[1], env)
+            count = self.eval(e.args[2], env)
+            if start < 0 or count < 0 or start + count > len(t):
+                raise CandorError("sous-chaîne hors limites", e.line, "runtime")
+            return t[start:start + count]
         if e.name == "arg_count":
             return len(self.args)
         if e.name == "arg":

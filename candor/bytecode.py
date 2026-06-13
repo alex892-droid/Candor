@@ -69,6 +69,7 @@ class Op:
     READ_FILE = 92       # dépile un chemin (Text), empile le contenu (effet File)
     ARG = 93             # dépile un index, empile l'argument programme correspondant
     ARG_COUNT = 94       # empile le nombre d'arguments programme
+    SUBSTR = 95          # dépile (count, start, text), empile la sous-chaîne
     RETURN = 96          # dépile la valeur de retour
 
 
