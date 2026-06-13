@@ -94,6 +94,14 @@ class _FuncCompiler:
             for el in e.elements:
                 self.expr(el)
             self.emit(Op.BUILD_LIST, len(e.elements))
+        elif isinstance(e, ast.RecordLit):
+            for fname, fexpr in e.fields:           # chaque champ : (clé Text, valeur)
+                self.emit(Op.CONST, self.module.const(fname))
+                self.expr(fexpr)
+            self.emit(Op.MAKE_RECORD, len(e.fields))
+        elif isinstance(e, ast.FieldAccess):
+            self.expr(e.obj)
+            self.emit(Op.GET_FIELD, self.module.const(e.field))
         elif isinstance(e, ast.Ident):
             self.emit(Op.LOAD, self.resolve(e.name))
         elif isinstance(e, ast.Unary):

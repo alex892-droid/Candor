@@ -153,6 +153,19 @@ class VM:
                 if i < 0 or i >= len(xs):
                     raise CandorError("indice de liste hors limites", None, "runtime")
                 f.stack.append(xs[i])
+            elif op == Op.MAKE_RECORD:
+                n = (code[f.ip] << 8) | code[f.ip + 1]
+                f.ip += 2
+                rec = {}
+                for _ in range(n):
+                    value = f.stack.pop()
+                    key = f.stack.pop()
+                    rec[key] = value
+                f.stack.append(rec)
+            elif op == Op.GET_FIELD:
+                idx = (code[f.ip] << 8) | code[f.ip + 1]
+                f.ip += 2
+                f.stack.append(f.stack.pop()[consts[idx]])
             elif op == Op.RETURN:
                 value = f.stack.pop()
                 frames.pop()

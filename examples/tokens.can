@@ -1,0 +1,67 @@
+// tokens.can — étape 2b du self-hosting : enregistrements (records).
+//
+// Un vrai lexer ne produit pas des nombres bruts mais des TOKENS typés. On combine
+// records + listes + récursion pour transformer "12+34*5" en une liste de Token, où
+// chaque token porte un genre (0 = nombre, 1 = opérateur) et une valeur. C'est la
+// structure exacte qu'un compilateur Candor manipulera pour se lire lui-même.
+
+record Token { kind: Int, value: Int }   // kind 0 = nombre ; kind 1 = opérateur (value = code ASCII)
+
+fn is_digit(c: Int) -> Bool do
+  give c >= 48 and c <= 57
+end
+
+fn end_number(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give end_number(t, i + 1) else give i end
+  else
+    give i
+  end
+end
+
+fn num_acc(t: Text, i: Int, acc: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give num_acc(t, i + 1, acc * 10 + (at(t, i) - 48)) else give acc end
+  else
+    give acc
+  end
+end
+
+fn lex(t: Text, i: Int) -> [Token] do
+  if i < len(t) then
+    if is_digit(at(t, i)) then
+      give cons(Token { kind: 0, value: num_acc(t, i, 0) }, lex(t, end_number(t, i)))
+    else
+      give cons(Token { kind: 1, value: at(t, i) }, lex(t, i + 1))
+    end
+  else
+    give []
+  end
+end
+
+// Compte les tokens dont le genre est 'opérateur', en lisant le champ .kind.
+fn count_ops(xs: [Token]) -> Int do
+  if is_empty(xs) then
+    give 0
+  else
+    let h: Token = head(xs)
+    if h.kind == 1 then
+      give 1 + count_ops(tail(xs))
+    else
+      give count_ops(tail(xs))
+    end
+  end
+end
+
+fn main() -> Int uses [Console] do
+  let toks: [Token] = lex("12+34*5", 0)
+  say("Nombre de tokens :")
+  say(len(toks))            // 5 : 12 + 34 * 5
+  say("Valeur du 1er token :")
+  say(get(toks, 0).value)   // 12  (accès au champ sur un élément de liste)
+  say("Genre du 1er token (0 = nombre) :")
+  say(get(toks, 0).kind)    // 0
+  say("Nombre d'operateurs :")
+  say(count_ops(toks))      // 2 : + et *
+  give 0
+end

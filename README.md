@@ -73,10 +73,11 @@ python tests/test_candor.py  # sinon, runner integre (16 tests)
 
 Implémenté : lexer, parser, vérificateur (types + effets + retour certain), interpréteur
 arbre, **compilateur bytecode + machine virtuelle à pile** avec format binaire `.canc` et
-désassembleur. Types : `Int`, `Bool`, `Text`, et **listes immuables `[T]`** (littéraux
-`[a, b, c]`, type déduit ; `[]` typé par le contexte). Effet de référence : `Console`.
-Intégrées : `say`, `len` (Text/liste), `at` (texte), et `cons` / `head` / `tail` /
-`is_empty` / `get` (listes) — toutes pures sauf `say`.
+désassembleur. Types : `Int`, `Bool`, `Text`, **listes immuables `[T]`** (littéraux
+`[a, b, c]` ; `[]` typé par le contexte) et **enregistrements immuables** (`record Token
+{ kind: Int, value: Int }`, construction `Token { ... }`, accès `t.kind`). Effet de
+référence : `Console`. Intégrées : `say`, `len` (Text/liste), `at` (texte), et `cons` /
+`head` / `tail` / `is_empty` / `get` (listes) — toutes pures sauf `say`.
 
 ## Vers le self-hosting
 
@@ -92,8 +93,10 @@ expressif pour exprimer un compilateur.
   `cons`/`head`/`tail`/`is_empty`/`get`. Démonstration : `examples/lexer.can` transforme
   un texte en liste d'entiers (un vrai mini-lexer). *Candor peut désormais produire une
   liste de tokens.*
-- [ ] **Étape 2b — enregistrements (structs).** Types nommés à champs typés, pour les
-  tokens (`Token{kind, value}`) et les nœuds d'AST.
-- [ ] **Étape 3 — effet `File`.** Lire le code source depuis un fichier.
+- [x] **Étape 2b — enregistrements (structs).** Types nommés à champs typés, construction
+  `Token { ... }` et accès `t.kind`. Démonstration : `examples/tokens.can` est un lexer
+  qui produit une `[Token]` typée. *Candor a maintenant tokens ET nœuds d'AST.*
+- [ ] **Étape 3 — effet `File`.** Lire le code source depuis un fichier (sinon le source
+  reste codé en dur dans le programme).
 - [ ] **Étape 4 — self-hosting.** Réécrire lexer → parser → checker → compilateur en
   Candor, jusqu'à ce que `candor exec compilateur.canc` compile du Candor.

@@ -9,12 +9,20 @@ from dataclasses import dataclass
 @dataclass
 class Program:
     functions: list
+    records: list
 
 
 @dataclass
 class Param:
     name: str
     type: str
+
+
+@dataclass
+class RecordDecl:
+    name: str
+    fields: list           # list[Param]
+    line: int
 
 
 @dataclass
@@ -108,4 +116,18 @@ class TextLit:
 @dataclass
 class ListLit:
     elements: list
+    line: int
+
+
+@dataclass
+class RecordLit:
+    type_name: str
+    fields: list           # list[(field_name, expr)]
+    line: int
+
+
+@dataclass
+class FieldAccess:
+    obj: object
+    field: str
     line: int

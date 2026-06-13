@@ -63,6 +63,10 @@ class Interpreter:
             return e.value
         if isinstance(e, ast.ListLit):
             return tuple(self.eval(el, env) for el in e.elements)   # liste immuable
+        if isinstance(e, ast.RecordLit):
+            return {fname: self.eval(fexpr, env) for fname, fexpr in e.fields}
+        if isinstance(e, ast.FieldAccess):
+            return self.eval(e.obj, env)[e.field]
         if isinstance(e, ast.Ident):
             return env[e.name]
         if isinstance(e, ast.Unary):

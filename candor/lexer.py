@@ -9,11 +9,11 @@ from .errors import CandorError
 
 KEYWORDS = {
     "fn", "do", "end", "let", "give", "if", "then", "else",
-    "uses", "and", "or", "not", "true", "false",
+    "uses", "and", "or", "not", "true", "false", "record",
 }
 
 TWO_CHAR_OPS = {"->", "==", "!=", "<=", ">="}
-SINGLE_CHARS = set("+-*/<>=:,()[]")
+SINGLE_CHARS = set("+-*/<>=:,()[]{}.")
 
 _ESCAPES = {"n": "\n", "t": "\t", "\\": "\\", '"': '"'}
 

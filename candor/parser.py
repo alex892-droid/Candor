@@ -21,9 +21,6 @@ Précédence des expressions (faible -> forte) :
 from . import ast
 from .errors import CandorError
 
-VALID_TYPES = {"Int", "Bool", "Text"}
-
-
 class Parser:
     def __init__(self, tokens):
         self.toks = tokens
@@ -65,9 +62,23 @@ class Parser:
 
     def parse_program(self):
         funcs = []
+        records = []
         while not self.at_end():
-            funcs.append(self.parse_function())
-        return ast.Program(funcs)
+            if self.check("KEYWORD", "record"):
+                records.append(self.parse_record_decl())
+            else:
+                funcs.append(self.parse_function())
+        return ast.Program(funcs, records)
+
+    def parse_record_decl(self):
+        kw = self.expect("KEYWORD", "record", "le mot-clé 'record'")
+        name = self.expect("IDENT", what="un nom d'enregistrement").value
+        self.expect("OP", "{")
+        fields = [self.parse_param()]
+        while self.match("OP", ","):
+            fields.append(self.parse_param())
+        self.expect("OP", "}")
+        return ast.RecordDecl(name, fields, kw.line)
 
     def parse_function(self):
         kw = self.expect("KEYWORD", "fn", "le mot-clé 'fn'")
@@ -101,17 +112,18 @@ class Parser:
         self.expect("OP", ":")
         return ast.Param(name, self.parse_type())
 
+    def parse_field_init(self):
+        name = self.expect("IDENT", what="un nom de champ").value
+        self.expect("OP", ":")
+        return (name, self.parse_expr())
+
     def parse_type(self):
         if self.match("OP", "["):                 # type liste : [T]
             inner = self.parse_type()
             self.expect("OP", "]")
             return "[" + inner + "]"
-        t = self.expect("IDENT", what="un type")
-        if t.value not in VALID_TYPES:
-            raise CandorError(
-                f"type inconnu : {t.value!r} (attendu Int, Bool, Text ou [T])", t.line, "parser"
-            )
-        return t.value
+        # scalaire ou nom d'enregistrement ; la validité est vérifiée par le checker
+        return self.expect("IDENT", what="un type").value
 
     # --- instructions --------------------------------------------------------
 
@@ -210,7 +222,15 @@ class Parser:
         if self.check("OP", "-"):
             tok = self.advance()
             return ast.Unary("-", self.parse_unary(), tok.line)
-        return self.parse_primary()
+        return self.parse_postfix()
+
+    def parse_postfix(self):
+        node = self.parse_primary()
+        while self.check("OP", "."):                # accès à un champ : obj.champ
+            tok = self.advance()
+            field = self.expect("IDENT", what="un nom de champ").value
+            node = ast.FieldAccess(node, field, tok.line)
+        return node
 
     def parse_primary(self):
         t = self.peek()
@@ -247,5 +267,11 @@ class Parser:
                         args.append(self.parse_expr())
                 self.expect("OP", ")")
                 return ast.Call(t.value, args, t.line)
+            if self.match("OP", "{"):              # littéral d'enregistrement : Nom { champ: expr, ... }
+                fields = [self.parse_field_init()]
+                while self.match("OP", ","):
+                    fields.append(self.parse_field_init())
+                self.expect("OP", "}")
+                return ast.RecordLit(t.value, fields, t.line)
             return ast.Ident(t.value, t.line)
         raise CandorError(f"expression attendue, trouvé {t.value!r}", t.line, "parser")

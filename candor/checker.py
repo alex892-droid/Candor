@@ -41,14 +41,47 @@ class Checker:
     def __init__(self, program):
         self.program = program
         self.funcs = {}
+        self.records = {}                       # nom -> {"order": [...], "fields": {nom: type}}
+
+        for r in getattr(program, "records", []):
+            if r.name in RESERVED:
+                raise CandorError(f"{r.name!r} est réservé", r.line, "checker")
+            if r.name in self.records:
+                raise CandorError(f"enregistrement redéfini : {r.name!r}", r.line, "checker")
+            order = []
+            fields = {}
+            for p in r.fields:
+                if p.name in fields:
+                    raise CandorError(f"champ dupliqué {p.name!r} dans {r.name!r}", r.line, "checker")
+                order.append(p.name)
+                fields[p.name] = p.type
+            self.records[r.name] = {"order": order, "fields": fields}
+
         for f in program.functions:
             if f.name in RESERVED:
                 raise CandorError(f"{f.name!r} est intégrée, ce nom est réservé", f.line, "checker")
+            if f.name in self.records:
+                raise CandorError(f"{f.name!r} est déjà un enregistrement", f.line, "checker")
             if f.name in self.funcs:
                 raise CandorError(f"fonction redéfinie : {f.name!r}", f.line, "checker")
             self.funcs[f.name] = f
 
+    def validate_type(self, t, line):
+        if is_list(t):
+            self.validate_type(elem_of(t), line)
+        elif t not in ("Int", "Bool", "Text") and t not in self.records:
+            raise CandorError(f"type inconnu : {t!r}", line, "checker")
+
     def check(self):
+        # valide tous les types des signatures et des champs avant d'analyser les corps
+        for name, schema in self.records.items():
+            for ftype in schema["fields"].values():
+                self.validate_type(ftype, None)
+        for f in self.program.functions:
+            for p in f.params:
+                self.validate_type(p.type, f.line)
+            self.validate_type(f.return_type, f.line)
+
         if "main" not in self.funcs:
             raise CandorError("aucune fonction 'main' trouvée", None, "checker")
         main = self.funcs["main"]
@@ -86,6 +119,7 @@ class Checker:
 
     def check_stmt(self, s, env, f, required):
         if isinstance(s, ast.LetStmt):
+            self.validate_type(s.type, s.line)
             t = self.type_of(s.expr, env, required, s.type)
             if t != s.type:
                 raise CandorError(
@@ -148,6 +182,41 @@ class Checker:
                         f"liste hétérogène : éléments {et} et {t2}", e.line, "checker"
                     )
             return "[" + et + "]"
+
+        if isinstance(e, ast.RecordLit):
+            if e.type_name not in self.records:
+                raise CandorError(f"enregistrement inconnu : {e.type_name!r}", e.line, "checker")
+            schema = self.records[e.type_name]
+            seen = set()
+            for fname, fexpr in e.fields:
+                if fname not in schema["fields"]:
+                    raise CandorError(f"{e.type_name!r} n'a pas de champ {fname!r}", e.line, "checker")
+                if fname in seen:
+                    raise CandorError(f"champ {fname!r} fourni deux fois", e.line, "checker")
+                seen.add(fname)
+                exp = schema["fields"][fname]
+                ft = self.type_of(fexpr, env, required, exp)
+                if ft != exp:
+                    raise CandorError(
+                        f"champ {fname!r} : attendu {exp}, reçu {ft}", e.line, "checker"
+                    )
+            missing = [f for f in schema["order"] if f not in seen]
+            if missing:
+                raise CandorError(
+                    f"{e.type_name!r} : champs manquants {missing}", e.line, "checker"
+                )
+            return e.type_name
+
+        if isinstance(e, ast.FieldAccess):
+            ot = self.type_of(e.obj, env, required)
+            if ot not in self.records:
+                raise CandorError(
+                    f"accès au champ '.{e.field}' sur un non-enregistrement ({ot})", e.line, "checker"
+                )
+            schema = self.records[ot]
+            if e.field not in schema["fields"]:
+                raise CandorError(f"{ot!r} n'a pas de champ {e.field!r}", e.line, "checker")
+            return schema["fields"][e.field]
 
         if isinstance(e, ast.Ident):
             if e.name not in env:

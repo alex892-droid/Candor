@@ -62,6 +62,9 @@ class Op:
     TAIL = 87            # dépile une liste, empile son reste
     ISEMPTY = 88         # dépile une liste, empile un Bool
     GET = 89             # dépile (index, liste), empile l'élément
+    # enregistrements immuables
+    MAKE_RECORD = 90     # u16 n : dépile n paires (clé, valeur), empile l'enregistrement
+    GET_FIELD = 91       # u16 index_constante (nom de champ) : dépile l'enreg., empile le champ
     RETURN = 96          # dépile la valeur de retour
 
 
@@ -73,9 +76,10 @@ BIN_OPS = {
     "==": Op.EQ, "!=": Op.NE, "<": Op.LT, ">": Op.GT, "<=": Op.LE, ">=": Op.GE,
 }
 
-_WITH_U16 = {Op.CONST, Op.LOAD, Op.STORE, Op.JUMP, Op.JUMP_IF_FALSE, Op.BUILD_LIST}
+_WITH_U16 = {Op.CONST, Op.LOAD, Op.STORE, Op.JUMP, Op.JUMP_IF_FALSE,
+             Op.BUILD_LIST, Op.MAKE_RECORD, Op.GET_FIELD}
 # opcodes portant un u16 simple (index/compteur), par opposition aux sauts (i16 relatif)
-_U16_PLAIN = {Op.CONST, Op.LOAD, Op.STORE, Op.BUILD_LIST}
+_U16_PLAIN = {Op.CONST, Op.LOAD, Op.STORE, Op.BUILD_LIST, Op.MAKE_RECORD, Op.GET_FIELD}
 
 
 @dataclass
@@ -253,7 +257,8 @@ def disassemble(module):
             if op in _U16_PLAIN:
                 arg = (code[ip] << 8) | code[ip + 1]
                 ip += 2
-                extra = f"   ; {_const_repr(module.consts[arg])}" if op == Op.CONST else ""
+                extra = (f"   ; {_const_repr(module.consts[arg])}"
+                         if op in (Op.CONST, Op.GET_FIELD) else "")
                 lines.append(f"  {start:4} {name:14} {arg}{extra}")
             elif op in (Op.JUMP, Op.JUMP_IF_FALSE):
                 rel = signed16(code, ip)

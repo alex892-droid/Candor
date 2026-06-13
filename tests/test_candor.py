@@ -279,6 +279,57 @@ def test_lexer_example_both_engines():
     assert _nums(out_vm) == ["3", "12", "51"]
 
 
+# --- enregistrements (étape 2b) ----------------------------------------------
+
+def test_record_construct_and_field_access():
+    src = (
+        "record Point { x: Int, y: Int }\n"
+        "fn main() -> Int uses [Console] do\n"
+        "  let p: Point = Point { x: 3, y: 7 }\n"
+        "  say(p.x)\n"          # 3
+        "  say(p.y)\n"          # 7
+        "  give 0\nend\n"
+    )
+    _, out_tree = run_source(src)
+    _, out_vm = run_vm(src)
+    assert _nums(out_tree) == ["3", "7"]
+    assert _nums(out_vm) == ["3", "7"]
+
+
+def test_record_missing_field_rejected():
+    e = expect_error(
+        "record Point { x: Int, y: Int }\n"
+        "fn main() -> Int do\n  let p: Point = Point { x: 1 }\n  give 0\nend\n"
+    )
+    assert e.phase == "checker"
+
+
+def test_record_wrong_field_type_rejected():
+    e = expect_error(
+        "record Point { x: Int, y: Int }\n"
+        "fn main() -> Int do\n  let p: Point = Point { x: 1, y: true }\n  give 0\nend\n"
+    )
+    assert e.phase == "checker"
+
+
+def test_unknown_record_rejected():
+    e = expect_error("fn main() -> Int do\n  let p: Nope = Nope { a: 1 }\n  give 0\nend\n")
+    assert e.phase == "checker"
+
+
+def test_field_access_on_non_record_rejected():
+    e = expect_error("fn main() -> Int do\n  let n: Int = 5\n  give n.x\nend\n")
+    assert e.phase == "checker"
+
+
+def test_tokens_example_both_engines():
+    src = _read_example("tokens.can")
+    _, out_tree = run_source(src)
+    _, out_vm = run_vm(src)
+    assert _nums(out_tree) == ["5", "12", "0", "2"]
+    assert _nums(out_vm) == ["5", "12", "0", "2"]
+
+
 # --- runner intégré (sans pytest) --------------------------------------------
 
 if __name__ == "__main__":
