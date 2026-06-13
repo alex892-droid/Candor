@@ -1,0 +1,145 @@
+// selfhost_compiler.can — ÉTAPE 4c : la chaîne COMPLÈTE écrite en Candor.
+//
+//   texte  --parse-->  AST (Node)  --compile-->  bytecode ([Int])  --VM à pile-->  résultat
+//
+// C'est l'architecture exacte de Candor lui-même (parser -> compilateur -> VM), reproduite
+// DANS Candor pour un mini-langage arithmétique. La pile de la VM est une liste d'entiers :
+// empiler = cons, sommet = head, dépiler = tail. Tout est immuable et récursif.
+//
+//   python -m candor exec examples/selfhost_compiler.can "2+3*4-(10-6)/2"   -> 12
+
+record Node { kind: Int, value: Int, left: [Node], right: [Node] }
+record Parsed { node: Node, next: Int }
+
+fn is_digit(c: Int) -> Bool do
+  give c >= 48 and c <= 57
+end
+
+fn end_number(t: Text, i: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give end_number(t, i + 1) else give i end
+  else
+    give i
+  end
+end
+
+fn num_acc(t: Text, i: Int, acc: Int) -> Int do
+  if i < len(t) then
+    if is_digit(at(t, i)) then give num_acc(t, i + 1, acc * 10 + (at(t, i) - 48)) else give acc end
+  else
+    give acc
+  end
+end
+
+// --- parser (texte -> AST) -------------------------------------------------
+
+fn parse_factor(t: Text, i: Int) -> Parsed do
+  if at(t, i) == 40 then
+    let inner: Parsed = parse_expr(t, i + 1)
+    give Parsed { node: inner.node, next: inner.next + 1 }
+  else
+    let e: Int = end_number(t, i)
+    give Parsed { node: Node { kind: 0, value: num_acc(t, i, 0), left: [], right: [] }, next: e }
+  end
+end
+
+fn term_loop(t: Text, acc: Node, i: Int) -> Parsed do
+  if i < len(t) then
+    let c: Int = at(t, i)
+    if c == 42 or c == 47 then
+      let rhs: Parsed = parse_factor(t, i + 1)
+      give term_loop(t, Node { kind: c, value: 0, left: [acc], right: [rhs.node] }, rhs.next)
+    else
+      give Parsed { node: acc, next: i }
+    end
+  else
+    give Parsed { node: acc, next: i }
+  end
+end
+
+fn parse_term(t: Text, i: Int) -> Parsed do
+  let f: Parsed = parse_factor(t, i)
+  give term_loop(t, f.node, f.next)
+end
+
+fn expr_loop(t: Text, acc: Node, i: Int) -> Parsed do
+  if i < len(t) then
+    let c: Int = at(t, i)
+    if c == 43 or c == 45 then
+      let rhs: Parsed = parse_term(t, i + 1)
+      give expr_loop(t, Node { kind: c, value: 0, left: [acc], right: [rhs.node] }, rhs.next)
+    else
+      give Parsed { node: acc, next: i }
+    end
+  else
+    give Parsed { node: acc, next: i }
+  end
+end
+
+fn parse_expr(t: Text, i: Int) -> Parsed do
+  let f: Parsed = parse_term(t, i)
+  give expr_loop(t, f.node, f.next)
+end
+
+// --- compilateur (AST -> bytecode [Int]) -----------------------------------
+// Encodage : opcode 0 suivi d'une valeur = PUSH ; sinon code ASCII de l'opérateur.
+
+fn append(xs: [Int], ys: [Int]) -> [Int] do
+  if is_empty(xs) then give ys else give cons(head(xs), append(tail(xs), ys)) end
+end
+
+fn compile_node(n: Node) -> [Int] do
+  if n.kind == 0 then
+    give cons(0, cons(n.value, []))                         // PUSH value
+  else
+    give append(append(compile_node(head(n.left)), compile_node(head(n.right))), cons(n.kind, []))
+  end
+end
+
+// --- VM à pile (exécute le bytecode) ---------------------------------------
+// La pile est une liste d'entiers : empiler = cons, sommet = head, dépiler = tail.
+
+fn run(code: [Int], i: Int, stack: [Int]) -> Int do
+  if i >= len(code) then
+    give head(stack)                                        // résultat = sommet de pile
+  else
+    let op: Int = get(code, i)
+    if op == 0 then
+      give run(code, i + 2, cons(get(code, i + 1), stack))  // PUSH
+    else
+      let b: Int = head(stack)
+      let a: Int = head(tail(stack))
+      let rest: [Int] = tail(tail(stack))
+      if op == 43 then
+        give run(code, i + 1, cons(a + b, rest))
+      else
+        if op == 45 then
+          give run(code, i + 1, cons(a - b, rest))
+        else
+          if op == 42 then
+            give run(code, i + 1, cons(a * b, rest))
+          else
+            give run(code, i + 1, cons(a / b, rest))
+          end
+        end
+      end
+    end
+  end
+end
+
+fn pick_src() -> Text do
+  if arg_count() > 0 then give arg(0) else give "2+3*4-(10-6)/2" end
+end
+
+fn main() -> Int uses [Console] do
+  let src: Text = pick_src()
+  let ast: Parsed = parse_expr(src, 0)            // 1. parse
+  let code: [Int] = compile_node(ast.node)         // 2. compile
+  say("Expression :")
+  say(src)
+  say("Instructions de bytecode :")
+  say(len(code))
+  say("Resultat (texte -> AST -> bytecode -> VM, 100% Candor) :")
+  say(run(code, 0, []))                            // 3. exécute sur la VM à pile
+  give 0
+end

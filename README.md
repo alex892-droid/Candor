@@ -112,6 +112,11 @@ expressif pour exprimer un compilateur.
     écrit en Candor : il construit un AST (`record Node` récursif) qu'un évaluateur séparé
     parcourt. Les records permettent de renvoyer `Parsed { node, next }` — fini la limite
     « une seule valeur de retour ». *Candor construit et consomme un arbre.*
-  - [ ] **Checker self-hosté.** Vérification types + effets.
-  - [ ] **Compilateur self-hosté.** Arbre → bytecode, jusqu'à ce que
-    `candor exec compilateur.canc source.can` produise le même `.canc` que la forge Python.
+  - [x] **Chaîne complète sur un mini-langage.** `examples/selfhost_compiler.can` fait
+    *texte → AST → bytecode → VM à pile*, 100% en Candor : un parser, un compilateur (AST →
+    liste d'instructions `[Int]`) et une machine à pile (pile = liste, push = `cons`). C'est
+    l'architecture même de Candor, reproduite dans Candor pour l'arithmétique. *La preuve que
+    le motif compilateur+VM est exprimable dans le langage.*
+  - [ ] **Boss final — compiler Candor lui-même.** Étendre parser/checker/compilateur au
+    langage entier, jusqu'à ce que `candor exec compilateur.canc source.can` produise le même
+    `.canc` que la forge Python.

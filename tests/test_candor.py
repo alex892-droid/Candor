@@ -429,6 +429,26 @@ def test_selfhost_parser_builds_ast_and_evaluates():
         assert _nums(out_tree)[-1] == expected, (expr, out_tree)
 
 
+# --- ÉTAPE 4c : chaîne complète parse -> compile -> VM, écrite EN Candor ------
+
+def test_selfhost_full_pipeline():
+    src = _read_example("selfhost_compiler.can")
+    cases = {
+        "2+3*4-(10-6)/2": "12",
+        "1+2+3+4": "10",
+        "2*3*4": "24",
+        "(1+2)*(3+4)": "21",
+        "100/5/2": "10",
+        "8/3": "2",
+        "7-2-1": "4",
+    }
+    for expr, expected in cases.items():
+        _, out_vm = run_vm(src, [expr])
+        _, out_tree = run_source(src, [expr])
+        assert _nums(out_vm)[-1] == expected, (expr, out_vm)
+        assert _nums(out_tree)[-1] == expected, (expr, out_tree)
+
+
 # --- runner intégré (sans pytest) --------------------------------------------
 
 if __name__ == "__main__":
